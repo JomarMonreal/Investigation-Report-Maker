@@ -45,6 +45,19 @@ export const toggleBlock = (editor: Editor, type: string, level?: number) => {
   }
 };
 
+export const toggleFontSize = (editor: Editor, change: number) => {
+  if (!editor.selection) return;
+
+  const marks = Editor.marks(editor) || {};
+  const currentSize = marks.fontSize
+    ? parseInt(marks.fontSize.replace('px', ''))
+    : 16;
+
+  const newSize = Math.max(8, currentSize + change);
+
+  Editor.addMark(editor, 'fontSize', `${newSize}px`);
+};
+
 export const isBlockActive = (editor: Editor, type: string, level?: number) => {
   const [match] = Editor.nodes(editor, {
     match: (n) => n.type === type && (level ? n.level === level : true),

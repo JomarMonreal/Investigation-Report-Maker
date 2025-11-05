@@ -1,11 +1,11 @@
 // src/components/Editor/EditorComponent.tsx
 import React, { useState } from 'react';
-import { createEditor, Editor, Transforms } from 'slate';
+import { createEditor } from 'slate';
 import { Slate, Editable, withReact } from 'slate-react';
 import { Box, Container } from '@mui/material';
 import { EditorToolbar } from './EditorToolbar';
 import { Leaf } from './Leaf';
-import { initialValue, toggleMark } from '../../utils/slateHelpers';
+import { initialValue, toggleFontSize, toggleMark } from '../../utils/slateHelpers';
 
 
 const EditorComponent: React.FC = () => {
@@ -19,19 +19,16 @@ const EditorComponent: React.FC = () => {
 // Handle keydown events for formatting and font size changes
   const onKeyDown = (event: React.KeyboardEvent) => {
     // Check for key combinations (e.g., Ctrl + B for bold, Ctrl + Shift + < for font size down)
-    if (event.ctrlKey && event.shiftKey) {
-      // Handle font size down (Ctrl + Shift + <)
-      if (event.key === ',' || event.key === '<') {
-        event.preventDefault();
-        adjustFontSize(editor, -1); // Decrease font size
-      }
-
-      // Handle font size up (Ctrl + Shift + >)
-      if (event.key === '.' || event.key === '>') {
-        event.preventDefault();
-        adjustFontSize(editor, 1); // Increase font size
-      }
+  if (event.ctrlKey && event.shiftKey) {
+    if (event.key === ',' || event.key === '<') {
+      event.preventDefault();
+      toggleFontSize(editor, -1); // decrease selected text
     }
+    if (event.key === '.' || event.key === '>') {
+      event.preventDefault();
+      toggleFontSize(editor, 1); // increase selected text
+    }
+  }
 
     if (event.ctrlKey) {
       // Bold (Ctrl + B)
@@ -53,29 +50,6 @@ const EditorComponent: React.FC = () => {
     }
   };
 
-const adjustFontSize = (editor: any, change: number) => {
-  // Find all text nodes (CustomText)
-  const [match] = Editor.nodes(editor, {
-    match: (n: any) => n.text !== undefined,
-  });
-
-  console.log('Match:', match);
-
-  if (match) {
-    const [node, path] = match;
-
-    // Parse the numeric part of fontSize, default to 16 if not set
-    const currentSize = node.fontSize ? parseInt(node.fontSize.replace('px', '')) : 16;
-    const newSize = Math.max(8, currentSize + change); // Minimum font size 8px
-
-    // Set the new fontSize on the specific node
-    Transforms.setNodes(
-      editor,
-      { fontSize: `${newSize}px` }, // Make sure it's a string again
-      { at: path }
-    );
-  }
-};
 
   return (
     <Slate editor={editor} initialValue={value} onChange={handleChange}>
