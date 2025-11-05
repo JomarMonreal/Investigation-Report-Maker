@@ -8,8 +8,75 @@ export type CustomText = { text: string; bold?: boolean; italic?: boolean; under
 // Initial editor content
 export const initialValue: CustomElement[] = [
   {
+    type: 'heading',
+    level: 1,
+    children: [{ text: 'Investigation Report' }],
+  },
+  {
     type: 'paragraph',
-    children: [{ text: 'Welcome to your Google Docs-like editor!' }],
+    children: [
+      { text: 'Case Number: ' },
+      { text: '2025-1123', bold: true },
+      { text: '\nDate: ' },
+      { text: 'November 4, 2025', bold: true },
+    ],
+  },
+  {
+    type: 'paragraph',
+    children: [
+      { text: 'Investigating Officer: ' },
+      { text: 'Detective Jane Doe', italic: true },
+    ],
+  },
+  {
+    type: 'paragraph',
+    children: [
+      {
+        text:
+          'Summary: On November 3, 2025, at approximately 22:30 hours, officers responded to a reported burglary at 123 Elm Street. Upon arrival, the premises were secured and initial evidence collected. Witness statements were taken, and CCTV footage was retrieved from neighboring properties.',
+      },
+    ],
+  },
+  {
+    type: 'heading',
+    level: 2,
+    children: [{ text: 'Evidence Collected' }],
+  },
+  {
+    type: 'paragraph',
+    children: [
+      { text: '1. Fingerprints from the front door handle.\n' },
+      { text: '2. CCTV footage from neighbor residence.\n' },
+      { text: '3. Footwear impressions in the backyard soil.\n' },
+    ],
+  },
+  {
+    type: 'heading',
+    level: 2,
+    children: [{ text: 'Witness Statements' }],
+  },
+  {
+    type: 'paragraph',
+    children: [
+      {
+        text:
+          'Witness John Smith reported seeing a suspicious individual leaving the property around 22:15 hours. The description matches a male, approximately 6 feet tall, wearing a dark hoodie.',
+      },
+    ],
+  },
+  {
+    type: 'heading',
+    level: 2,
+    children: [{ text: 'Conclusion' }],
+  },
+  {
+    type: 'paragraph',
+    children: [
+      {
+        text:
+          'The investigation is ongoing. Evidence has been documented and forwarded to the forensics department. Further interviews will be conducted as leads are developed.',
+      },
+    ],
   },
 ];
 

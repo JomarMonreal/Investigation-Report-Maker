@@ -14,7 +14,6 @@ export const Leaf = ({ attributes, children, leaf }: any) => {
     style.textDecoration = 'underline';
   }
   if (leaf.fontSize) {
-    console.log(leaf.fontSize)
     style.fontSize = leaf.fontSize; // Apply custom font size
   }
 
