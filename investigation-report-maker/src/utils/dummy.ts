@@ -1,3 +1,5 @@
+import type { CustomElement } from "./slateHelpers";
+
 export const informalReport = "Date/time: Nov 5, 2025 around 8:45 in the evening\
     place: Rizal street corner Mabini ave Brgy Maligalig Los Banos Laguna\
     Type: Robbery and assault (physical)\
@@ -79,3 +81,270 @@ export const JSONFormat = `{"content": [
 ]
 }
 ]`
+
+export const policeReportSummary: CustomElement[] = [
+  {
+    type: 'heading',
+    level: 1,
+    children: [{ text: 'Report Summary', bold: true, fontSize: '20px' }],
+  },
+
+  // A. Case Overview
+  {
+    type: 'heading',
+    level: 2,
+    children: [{ text: 'A. Case Overview', bold: true, fontSize: '16px' }],
+  },
+  {
+    type: 'paragraph',
+    children: [
+      { text: 'Case No.:', bold: true },
+      { text: ' PR-2025-1106-0412   ' },
+      { text: 'Incident:', bold: true },
+      { text: ' Vehicle burglary at a residential lot on November 6, 2025, ~02:55 AM.' },
+    ],
+  },
+
+  // B. Key Facts
+  {
+    type: 'heading',
+    level: 2,
+    children: [{ text: 'B. Key Facts', bold: true, fontSize: '16px' }],
+  },
+  {
+    type: 'paragraph',
+    children: [
+      {
+        text:
+          'Rear passenger window shattered; backpack and 13-inch laptop taken from a silver sedan at 1200 Block, Oakview Apartments, Lot B.',
+      },
+    ],
+  },
+
+  // C. Parties
+  {
+    type: 'heading',
+    level: 2,
+    children: [{ text: 'C. Parties', bold: true, fontSize: '16px' }],
+  },
+  {
+    type: 'paragraph',
+    children: [
+      { text: 'Victim:', bold: true },
+      { text: ' Alex Morgan (DOB: 1991-03-17). ' },
+      { text: 'Suspect:', bold: true },
+      { text: ' Jordan Rivera (DOB: 1997-09-05), detained. ' },
+      { text: 'Witness:', bold: true },
+      { text: ' Casey Taylor observed the break-in and flight toward Maple Street.' },
+    ],
+  },
+
+  // D. Evidence
+  {
+    type: 'heading',
+    level: 2,
+    children: [{ text: 'D. Evidence', bold: true, fontSize: '16px' }],
+  },
+  {
+    type: 'paragraph',
+    children: [
+      {
+        text:
+          'Photos of damage; latent prints from door handle; recovered backpack and laptop (serial recorded); surveillance video request submitted to property management.',
+      },
+    ],
+  },
+
+  // E. Actions
+  {
+    type: 'heading',
+    level: 2,
+    children: [{ text: 'E. Actions', bold: true, fontSize: '16px' }],
+  },
+  {
+    type: 'paragraph',
+    children: [
+      {
+        text:
+          'Area canvass conducted; suspect located two blocks east carrying matching backpack; field show-up positive; arrest made; property logged.',
+      },
+    ],
+  },
+
+  // F. Findings
+  {
+    type: 'heading',
+    level: 2,
+    children: [{ text: 'F. Findings', bold: true, fontSize: '16px' }],
+  },
+  {
+    type: 'paragraph',
+    children: [
+      {
+        text:
+          'Probable cause established via witness account, possession of stolen property, and physical evidence consistent with forced entry.',
+      },
+    ],
+  },
+
+  // G. Disposition
+  {
+    type: 'heading',
+    level: 2,
+    children: [{ text: 'G. Disposition', bold: true, fontSize: '16px' }],
+  },
+  {
+    type: 'paragraph',
+    children: [
+      {
+        text:
+          'Suspect booked at Central Station on felony burglary; evidence held; case forwarded to the District Attorney for charging review.',
+      },
+    ],
+  },
+
+  // H. Next Steps
+  {
+    type: 'heading',
+    level: 2,
+    children: [{ text: 'H. Next Steps', bold: true, fontSize: '16px' }],
+  },
+  {
+    type: 'paragraph',
+    children: [
+      {
+        text:
+          'Obtain and review surveillance footage; process latent prints; coordinate property release to victim; file supplemental report with lab results.',
+      },
+    ],
+  },
+
+  // Footer
+  {
+    type: 'paragraph',
+    children: [
+      {
+        text: 'Summary derived from the fictional incident for testing purposes.',
+        italic: true,
+        fontSize: '12px',
+      },
+    ],
+  },
+];
+
+export const policeReportTemplate: CustomElement[] = [
+  {
+    type: "heading",
+    level: 1,
+    children: [{ text: "{{REPORT_TITLE}}", bold: true }],
+  },
+
+  // A. Case Overview
+  {
+    type: "heading",
+    level: 2,
+    children: [{ text: "A. Case Overview", bold: true }],
+  },
+  {
+    type: "paragraph",
+    children: [
+      { text: "Case No.: ", bold: true },
+      { text: "{{CASE_NUMBER}}  " },
+      { text: "Incident: ", bold: true },
+      { text: "{{INCIDENT_SUMMARY}}" },
+    ],
+  },
+
+  // B. Key Facts
+  {
+    type: "heading",
+    level: 2,
+    children: [{ text: "B. Key Facts", bold: true }],
+  },
+  {
+    type: "paragraph",
+    children: [{ text: "{{KEY_FACTS}}" }],
+  },
+
+  // C. Parties
+  {
+    type: "heading",
+    level: 2,
+    children: [{ text: "C. Parties", bold: true }],
+  },
+  {
+    type: "paragraph",
+    children: [
+      { text: "Victim: ", bold: true },
+      { text: "{{VICTIM_NAME}} (DOB: {{VICTIM_DOB}}). " },
+      { text: "Suspect: ", bold: true },
+      { text: "{{SUSPECT_NAME}} (DOB: {{SUSPECT_DOB}}) — {{SUSPECT_STATUS}}. " },
+      { text: "Witness: ", bold: true },
+      { text: "{{WITNESS_STATEMENT_BRIEF}}" },
+    ],
+  },
+
+  // D. Evidence
+  {
+    type: "heading",
+    level: 2,
+    children: [{ text: "D. Evidence", bold: true }],
+  },
+  {
+    type: "paragraph",
+    children: [{ text: "{{EVIDENCE_SUMMARY}}" }],
+  },
+
+  // E. Actions
+  {
+    type: "heading",
+    level: 2,
+    children: [{ text: "E. Actions", bold: true }],
+  },
+  {
+    type: "paragraph",
+    children: [{ text: "{{ACTIONS_TAKEN}}" }],
+  },
+
+  // F. Findings
+  {
+    type: "heading",
+    level: 2,
+    children: [{ text: "F. Findings", bold: true }],
+  },
+  {
+    type: "paragraph",
+    children: [{ text: "{{FINDINGS}}" }],
+  },
+
+  // G. Disposition
+  {
+    type: "heading",
+    level: 2,
+    children: [{ text: "G. Disposition", bold: true }],
+  },
+  {
+    type: "paragraph",
+    children: [{ text: "{{DISPOSITION}}" }],
+  },
+
+  // H. Next Steps
+  {
+    type: "heading",
+    level: 2,
+    children: [{ text: "H. Next Steps", bold: true }],
+  },
+  {
+    type: "paragraph",
+    children: [{ text: "{{NEXT_STEPS}}" }],
+  },
+
+  // Footer
+  {
+    type: "paragraph",
+    children: [
+      { text: "Prepared by: ", italic: true },
+      { text: "{{OFFICER_NAME}} (Badge {{BADGE_NUMBER}})", italic: true },
+    ],
+  },
+];
