@@ -1,5 +1,218 @@
 import type { CustomElement } from "./slateHelpers";
 
+export const systemPrompt = `You are an assistant that creates affidafits for the police. you will be given a JSON object that contains the details of the report. Fix spellings and grammar, the output will be rendered in rich text using slate-react so your response should follow a strict format.
+Here are the type definitions written in TypeScript:
+
+type CustomElement = { type: 'paragraph' | 'heading'; level?: number; children: CustomText[] };
+type CustomText = { text: string; bold?: boolean; italic?: boolean; underline?: boolean; fontSize?: string };
+
+and your response should be a list of CustomeElements. Here is an example:
+
+
+[
+  {
+    type: 'heading',
+    level: 1,
+    children: [
+      {
+        text: 'Police Incident Report',
+        bold: true,
+        fontSize: '20px',
+      },
+    ],
+  },
+  {
+    type: 'paragraph',
+    children: [
+      {
+        text: 'Case No.:',
+        bold: true,
+      },
+      { text: ' PR-2025-1106-0412   ' },
+      {
+        text: 'Date/Time Filed:',
+        bold: true,
+      },
+      { text: ' November 6, 2025, 04:12 AM' },
+    ],
+  },
+
+  // A. Summary
+  {
+    type: 'heading',
+    level: 2,
+    children: [{ text: 'A. Summary', bold: true, fontSize: '16px' }],
+  },
+  {
+    type: 'paragraph',
+    children: [
+      {
+        text:
+          'Officers responded to a reported vehicle burglary in a residential parking lot. A suspect was detained nearby and property was recovered. No injuries reported.',
+      },
+    ],
+  },
+
+  // B. Incident Details
+  {
+    type: 'heading',
+    level: 2,
+    children: [{ text: 'B. Incident Details', bold: true, fontSize: '16px' }],
+  },
+  {
+    type: 'paragraph',
+    children: [
+      { text: 'Type:', bold: true },
+      { text: ' Vehicle Burglary (Felony)   ' },
+      { text: 'Statute:', bold: true },
+      { text: ' 487(a) PC   ' },
+      { text: 'Incident Date/Time:', bold: true },
+      { text: ' November 6, 2025, approx. 02:55 AM   ' },
+      { text: 'Location:', bold: true },
+      { text: ' 1200 Block, Oakview Apartments, Lot B' },
+    ],
+  },
+  {
+    type: 'paragraph',
+    children: [
+      {
+        text:
+          'Upon arrival, officers observed a sedan with a shattered rear passenger window. Glass fragments were on the ground. A backpack and a laptop were reported missing by the vehicle owner.',
+      },
+    ],
+  },
+
+  // C. Involved Parties
+  {
+    type: 'heading',
+    level: 2,
+    children: [{ text: 'C. Involved Parties', bold: true, fontSize: '16px' }],
+  },
+  {
+    type: 'paragraph',
+    children: [
+      { text: 'Victim:', bold: true },
+      { text: ' Morgan, Alex (DOB: 1991-03-17) — ' },
+      { text: 'Contact:', bold: true },
+      { text: ' (555) 201-8890; ' },
+      { text: 'Address:', bold: true },
+      { text: ' 1242 Oakview Dr., Unit 3C' },
+    ],
+  },
+  {
+    type: 'paragraph',
+    children: [
+      { text: 'Suspect:', bold: true },
+      { text: ' Rivera, Jordan (DOB: 1997-09-05) — ' },
+      { text: 'Description:', bold: true },
+      { text: ' M, approx. 5’10”, dark hoodie, jeans; ' },
+      { text: 'Status:', bold: true },
+      { text: ' Detained/Arrested' },
+    ],
+  },
+
+  // D. Witness Statements
+  {
+    type: 'heading',
+    level: 2,
+    children: [{ text: 'D. Witness Statements', bold: true, fontSize: '16px' }],
+  },
+  {
+    type: 'paragraph',
+    children: [
+      { text: 'Witness 1:', bold: true },
+      { text: ' Taylor, Casey — ' },
+      {
+        text:
+          'stated they heard glass breaking at approximately 02:55 AM and saw an individual wearing a dark hoodie reach into a silver sedan. The individual left on foot toward Maple Street.',
+        italic: true,
+      },
+    ],
+  },
+
+  // E. Evidence Collected
+  {
+    type: 'heading',
+    level: 2,
+    children: [{ text: 'E. Evidence Collected', bold: true, fontSize: '16px' }],
+  },
+  {
+    type: 'paragraph',
+    children: [
+      {
+        text:
+          '1) Photograph set (vehicle damage, glass on pavement). 2) Surveillance video request submitted to Oakview Apartments management. 3) Recovered property: black backpack with company logo; silver 13-inch laptop with minor dent (serial recorded). 4) Latent prints lifted from door handle.',
+      },
+    ],
+  },
+
+  // F. Actions Taken
+  {
+    type: 'heading',
+    level: 2,
+    children: [{ text: 'F. Actions Taken', bold: true, fontSize: '16px' }],
+  },
+  {
+    type: 'paragraph',
+    children: [
+      {
+        text:
+          'Officers canvassed the area and located the suspect two blocks east, carrying a black backpack matching the victim’s description. A field show-up was conducted; the victim positively identified the backpack and laptop as theirs. Suspect was searched incident to arrest; no weapons found.',
+      },
+    ],
+  },
+
+  // G. Disposition
+  {
+    type: 'heading',
+    level: 2,
+    children: [{ text: 'G. Disposition', bold: true, fontSize: '16px' }],
+  },
+  {
+    type: 'paragraph',
+    children: [
+      {
+        text:
+          'Suspect booked at Central Station on felony burglary. Property logged and will be returned to the victim upon release by evidence. Case forwarded to the District Attorney for review.',
+      },
+    ],
+  },
+
+  // H. Reporting Officer
+  {
+    type: 'heading',
+    level: 2,
+    children: [{ text: 'H. Reporting Officer', bold: true, fontSize: '16px' }],
+  },
+  {
+    type: 'paragraph',
+    children: [
+      { text: 'Reporting Officer:', bold: true },
+      { text: ' Ptl. Riley Chen, Badge #4721   ' },
+      { text: 'Supervisor Review:', bold: true },
+      { text: ' Sgt. Dana Price, #3109   ' },
+      { text: 'Report Completed:', bold: true },
+      { text: ' November 6, 2025, 04:12 AM' },
+    ],
+  },
+
+  // Footer
+  {
+    type: 'paragraph',
+    children: [
+      {
+        text:
+          'This is a fictional report for testing and demonstration purposes only.',
+        italic: true,
+        fontSize: '12px',
+      },
+    ],
+  },
+];
+
+you may change the styles of the text and the content but the JSON format should be similar.
+`
+
 export const informalReport = "Date/time: Nov 5, 2025 around 8:45 in the evening\
     place: Rizal street corner Mabini ave Brgy Maligalig Los Banos Laguna\
     Type: Robbery and assault (physical)\
@@ -22,7 +235,7 @@ export const JSONFormat = `{"content": [
 "children": [
 { "text": "Case Number: " },
 { "text": "2025-1123", "bold": true },
-{ "text": "\nDate: " },
+{ "text": "Date: " },
 { "text": "November 4, 2025", "bold": true }
 ]
 },
