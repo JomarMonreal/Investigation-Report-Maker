@@ -89,7 +89,7 @@ const ReportCreation: React.FC = () => {
     } catch (err) {
       alert(`Failed to generate report: ${err instanceof Error ? err.message : "Unknown error"}`);
     }
-  }, [details.caseTitle, resultEditor, title]);
+  }, [details, resultEditor, title]);
 
   const handleLoadError = React.useCallback((message: string) => {
     alert(`Template import failed: ${message}`);
