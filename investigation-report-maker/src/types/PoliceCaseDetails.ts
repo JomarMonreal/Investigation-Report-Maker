@@ -15,4 +15,23 @@ export interface PoliceCaseDetails {
   priority: CasePriority;
   evidenceSummary: string;
   narrative: string;        // big text area
+
+  arrestingOfficerAge: number;
+  arrestingOfficerStation: string;
+  arrestingOfficerHomeAddress: string;
+  currentDate: string; // ISO date (YYYY-MM-DD)
+  administeringOfficer: string;
+
+  suspectName: string;
+  suspectOccupation: string;
+  suspectHomeAddress: string;
+  suspectEvents: string;
+
+  officerEvents: Array<{
+    time: string; // 24h time (HH:MM)
+    location: string;
+    action: string;
+    peopleInvolved: string;
+    materialsUsed: string;
+  }>;
 }

@@ -21,27 +21,37 @@ const ReportCreation: React.FC = () => {
 
   // Details form
   const [details, setDetails] = React.useState<PoliceCaseDetails>({
-    assignedOfficer: "",
-    badgeNumber: "",
     caseNumber: "",
     caseTitle: "",
-    contactNumber: "",
     date: "",
-    evidenceSummary: "",
+    time: "",
     incidentType: "",
-    involvedParties: "",
     location: "",
-    narrative: "",
-    priority: "Low",
     reportingPerson: "",
-    time: ""
+    contactNumber: "",
+    involvedParties: "",
+    assignedOfficer: "",
+    badgeNumber: "",
+    priority: "Low",
+    evidenceSummary: "",
+    narrative: "",
+    arrestingOfficerAge: 0,
+    arrestingOfficerStation: "",
+    arrestingOfficerHomeAddress: "",
+    currentDate: "",
+    administeringOfficer: "",
+    suspectName: "",
+    suspectOccupation: "",
+    suspectHomeAddress: "",
+    suspectEvents: "",
+    officerEvents: []
   });
 
   // NEW: cache the last loaded template (do not auto-apply)
   const [templateCache, setTemplateCache] = React.useState<CustomElement[] | null>(null);
 
   const handleLoadTemplate = React.useCallback(
-    (template: CustomElement[], _info: { filename: string }) => {
+    (template: CustomElement[]) => {
       setTemplateCache(template); // store only
     },
     []
@@ -63,16 +73,16 @@ const ReportCreation: React.FC = () => {
       //     {role: 'user', content: JSON.stringify(details)}
       //   ]
       // })
-      const response = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ details, systemPrompt })
-      }).then(res => res.json());
+      // const response = await fetch("/api/generate", {
+      //   method: "POST",
+      //   headers: { "Content-Type": "application/json" },
+      //   body: JSON.stringify({ details, systemPrompt })
+      // }).then(res => res.json());
 
 
-      const test = JSON.parse(response.message.content).elements
-      // const nodes = policeReportSummary as unknown as Descendant[];
-      const nodes = test as unknown as Descendant[];
+      // const test = JSON.parse(response.message.content).elements
+      // const nodes = test as unknown as Descendant[];
+      const nodes = policeReportSummary as unknown as Descendant[];
 
       Editor.withoutNormalizing(resultEditor, () => {
         Transforms.select(resultEditor, { anchor: Editor.start(resultEditor, []), focus: Editor.end(resultEditor, []) });
@@ -96,7 +106,11 @@ const ReportCreation: React.FC = () => {
   }, []);
 
   return (
-    <Slate editor={resultEditor} initialValue={resultValue} onChange={setResultValue}>
+    <Slate
+      editor={resultEditor}
+      initialValue={resultValue}
+      onChange={(value) => setResultValue(value as CustomElement[])} // Fixed type mismatch
+    >
       <DocScaffoldLoad
         title={title}
         view={view}
