@@ -28,6 +28,7 @@ export interface PoliceCaseDetails {
   suspectEvents: string;
 
   officerEvents: Array<{
+    date: string; // ISO date (YYYY-MM-DD)
     time: string; // 24h time (HH:MM)
     location: string;
     action: string;

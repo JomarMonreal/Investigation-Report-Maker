@@ -56,7 +56,7 @@ export const PoliceCaseDetailsForm: React.FC<PoliceCaseDetailsFormProps> = ({
   const addOfficerEvent = () => {
     setField("officerEvents", [
       ...value.officerEvents,
-      { time: "", location: "", action: "", peopleInvolved: "", materialsUsed: "" }
+      { date: value.date, time: "", location: value.location, action: "", peopleInvolved: "", materialsUsed: "" }
     ]);
   };
 
@@ -68,10 +68,10 @@ export const PoliceCaseDetailsForm: React.FC<PoliceCaseDetailsFormProps> = ({
   React.useEffect(() => {
     if (value.officerEvents.length === 0) {
       setField("officerEvents", [
-        { time: "", location: "", action: "", peopleInvolved: "", materialsUsed: "" }
+      { date: value.date, time: "", location: value.location, action: "", peopleInvolved: "", materialsUsed: "" }
       ]);
     }
-  }, [value.officerEvents.length, setField]);
+  }, [value.officerEvents.length, setField, value.date, value.location]);
 
   const incidentTypes = [
     "Assault",
@@ -355,19 +355,34 @@ export const PoliceCaseDetailsForm: React.FC<PoliceCaseDetailsFormProps> = ({
                 }}
               >
                 <Stack spacing={2}>
-                  <TextField
-                    label={`Officer Event ${index + 1} Time`}
-                    type="time"
-                    value={event.time}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                      const updatedEvents = [...value.officerEvents];
-                      updatedEvents[index].time = e.target.value;
-                      setField("officerEvents", updatedEvents);
-                    }}
-                    disabled={disabled}
-                    InputLabelProps={{ shrink: true }}
-                    fullWidth
-                  />
+                  <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                    <TextField
+                      label={`Officer Event ${index + 1} Date`}
+                      type="date"
+                      value={event.date}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                        const updatedEvents = [...value.officerEvents];
+                        updatedEvents[index].date = e.target.value;
+                        setField("officerEvents", updatedEvents);
+                      }}
+                      disabled={disabled}
+                      InputLabelProps={{ shrink: true }}
+                      fullWidth
+                    />
+                    <TextField
+                      label={`Officer Event ${index + 1} Time`}
+                      type="time"
+                      value={event.time}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                        const updatedEvents = [...value.officerEvents];
+                        updatedEvents[index].time = e.target.value;
+                        setField("officerEvents", updatedEvents);
+                      }}
+                      disabled={disabled}
+                      InputLabelProps={{ shrink: true }}
+                      fullWidth
+                    />
+                  </Stack>
 
                   <TextField
                     label={`Officer Event ${index + 1} Location`}
@@ -375,18 +390,6 @@ export const PoliceCaseDetailsForm: React.FC<PoliceCaseDetailsFormProps> = ({
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                       const updatedEvents = [...value.officerEvents];
                       updatedEvents[index].location = e.target.value;
-                      setField("officerEvents", updatedEvents);
-                    }}
-                    disabled={disabled}
-                    fullWidth
-                  />
-
-                  <TextField
-                    label={`Officer Event ${index + 1} Action`}
-                    value={event.action}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                      const updatedEvents = [...value.officerEvents];
-                      updatedEvents[index].action = e.target.value;
                       setField("officerEvents", updatedEvents);
                     }}
                     disabled={disabled}
@@ -415,6 +418,20 @@ export const PoliceCaseDetailsForm: React.FC<PoliceCaseDetailsFormProps> = ({
                     }}
                     disabled={disabled}
                     fullWidth
+                  />
+
+                  <TextField
+                    label={`Officer Event ${index + 1} Action`}
+                    value={event.action}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                      const updatedEvents = [...value.officerEvents];
+                      updatedEvents[index].action = e.target.value;
+                      setField("officerEvents", updatedEvents);
+                    }}
+                    disabled={disabled}
+                    fullWidth
+                    multiline
+                    minRows={2}
                   />
 
                   <Button
