@@ -94,6 +94,38 @@ const Home: React.FC = () => {
             </CardContent>
           </CardActionArea>
         </Card>
+
+        {/* Police Officer Management */}
+        <Card
+          variant="outlined"
+          sx={{
+            border: 1,
+            borderColor: "divider",
+            flex: "1 1 420px",
+            maxWidth: 720,
+            minHeight: 160,
+            display: "flex"
+          }}
+        >
+          <CardActionArea
+            onClick={() => navigate("/police-officer-management")}
+            sx={{ p: 2, display: "flex", flexDirection: "column", alignItems: "stretch" }}
+          >
+            <CardContent sx={{ p: 0 }}>
+              <Stack direction="row" spacing={2} alignItems="flex-start">
+                <DescriptionIcon fontSize="large" color="primary" />
+                <Stack>
+                  <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                    Manage Police Officers
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Manage and track police officers and their assignments.
+                  </Typography>
+                </Stack>
+              </Stack>
+            </CardContent>
+          </CardActionArea>
+        </Card>
       </Box>
     </Stack>
   );

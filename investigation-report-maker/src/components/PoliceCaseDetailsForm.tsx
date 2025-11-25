@@ -1,16 +1,20 @@
 import * as React from "react";
 import {
   Box,
-  Button,
+  Button, // Re-added Button import
   FormControl,
-  FormHelperText,
   InputLabel,
   MenuItem,
   Select,
   Stack,
-  TextField
+  TextField,
+  Autocomplete,
+  createFilterOptions
 } from "@mui/material";
-import type { PoliceCaseDetails, CasePriority } from "../types/PoliceCaseDetails";
+import type { PoliceCaseDetails, CasePriority } from "../types/PoliceCaseDetails"; // Ensure types are imported
+import { usePoliceOfficerContext } from "../context/PoliceOfficerContext"; // Import context
+import { useNavigate } from "react-router-dom";
+
 
 export interface PoliceCaseDetailsFormProps {
   readonly value: PoliceCaseDetails;
@@ -28,13 +32,16 @@ export const PoliceCaseDetailsForm: React.FC<PoliceCaseDetailsFormProps> = ({
   disabled
 }) => {
   const [touched, setTouched] = React.useState<Record<keyof PoliceCaseDetails, boolean>>({});
+  const { officers } = usePoliceOfficerContext(); // Use officers from context
+  const navigate = useNavigate();
+
+  const handleAddNewOfficer = () => {
+    navigate("/police-officer-management");
+  };
 
   const setField = React.useCallback(<K extends keyof PoliceCaseDetails>(key: K, next: PoliceCaseDetails[K]) => {
     onChange({ ...value, [key]: next });
   }, [onChange, value]); // Memoized to prevent re-creation on every render
-
-  const touch = (k: keyof PoliceCaseDetails) =>
-    setTouched((t) => ({ ...t, [k]: true }));
 
   const err = (k: keyof PoliceCaseDetails) =>
     touched[k] && !required(String(value[k] ?? ""));
@@ -47,7 +54,7 @@ export const PoliceCaseDetailsForm: React.FC<PoliceCaseDetailsFormProps> = ({
   };
 
   const removeOfficerEvent = (index: number) => {
-    const updatedEvents = value.officerEvents.filter((_, i) => i !== index);
+    const updatedEvents = value.officerEvents.filter((_, i: number) => i !== index);
     setField("officerEvents", updatedEvents);
   };
 
@@ -59,96 +66,46 @@ export const PoliceCaseDetailsForm: React.FC<PoliceCaseDetailsFormProps> = ({
     }
   }, [value.officerEvents.length, setField]); // Added missing dependencies
 
+  const incidentTypes = [
+    "Theft",
+    "Assault",
+    "Fraud",
+    "Vandalism",
+    "Robbery",
+    "Kidnapping",
+    "Illegal Drugs",
+    "Cybercrime",
+    "Domestic Violence",
+    "Human Trafficking",
+    "Murder",
+    "Homicide",
+    "Carnapping",
+    "Physical Injury"
+  ];
+
+  const filter = createFilterOptions<string>();
+
   return (
     <Box component="form" noValidate autoComplete="off">
       <Stack spacing={2}>
-        {/* Officer Details */}
-        <TextField
-          label="Assigned Officer"
-          value={value.assignedOfficer}
-          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setField("assignedOfficer", e.target.value)}
-          onBlur={() => touch("assignedOfficer")}
-          error={!!err("assignedOfficer")}
-          helperText={err("assignedOfficer") ? "Required" : " "}
-          disabled={disabled}
-          fullWidth
-        />
-
-        <TextField
-          label="Badge Number"
-          value={value.badgeNumber}
-          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setField("badgeNumber", e.target.value)}
-          onBlur={() => touch("badgeNumber")}
-          error={!!err("badgeNumber")}
-          helperText={err("badgeNumber") ? "Required" : " "}
-          disabled={disabled}
-          fullWidth
-        />
-
-        <TextField
-          label="Arresting Officer Age"
-          type="number"
-          value={value.arrestingOfficerAge}
-          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setField("arrestingOfficerAge", Number(e.target.value))}
-          onBlur={() => touch("arrestingOfficerAge")}
-          error={!!err("arrestingOfficerAge")}
-          helperText={err("arrestingOfficerAge") ? "Required" : " "}
-          disabled={disabled}
-          fullWidth
-        />
-
-        <TextField
-          label="Arresting Officer Station"
-          value={value.arrestingOfficerStation}
-          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setField("arrestingOfficerStation", e.target.value)}
-          onBlur={() => touch("arrestingOfficerStation")}
-          error={!!err("arrestingOfficerStation")}
-          helperText={err("arrestingOfficerStation") ? "Required" : " "}
-          disabled={disabled}
-          fullWidth
-        />
-
-        <TextField
-          label="Arresting Officer Home Address"
-          value={value.arrestingOfficerHomeAddress}
-          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setField("arrestingOfficerHomeAddress", e.target.value)}
-          onBlur={() => touch("arrestingOfficerHomeAddress")}
-          error={!!err("arrestingOfficerHomeAddress")}
-          helperText={err("arrestingOfficerHomeAddress") ? "Required" : " "}
-          disabled={disabled}
-          fullWidth
-        />
-
-        <TextField
-          label="Administering Officer"
-          value={value.administeringOfficer}
-          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setField("administeringOfficer", e.target.value)}
-          onBlur={() => touch("administeringOfficer")}
-          error={!!err("administeringOfficer")}
-          helperText={err("administeringOfficer") ? "Required" : " "}
-          disabled={disabled}
-          fullWidth
-        />
-
         {/* Case Details */}
-        <TextField
-          label="Case Number"
-          value={value.caseNumber}
-          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setField("caseNumber", e.target.value)}
-          onBlur={() => touch("caseNumber")}
-          error={!!err("caseNumber")}
-          helperText={err("caseNumber") ? "Required" : " "}
-          disabled={disabled}
-          fullWidth
-        />
-
         <TextField
           label="Case Title"
           value={value.caseTitle}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setField("caseTitle", e.target.value)}
-          onBlur={() => touch("caseTitle")}
+          onBlur={() => setTouched((t) => ({ ...t, caseTitle: true }))}
           error={!!err("caseTitle")}
           helperText={err("caseTitle") ? "Required" : " "}
+          disabled={disabled}
+          fullWidth
+        />
+        <TextField
+          label="Case Number"
+          value={value.caseNumber}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setField("caseNumber", e.target.value)}
+          onBlur={() => setTouched((t) => ({ ...t, caseNumber: true }))}
+          error={!!err("caseNumber")}
+          helperText={err("caseNumber") ? "Required" : " "}
           disabled={disabled}
           fullWidth
         />
@@ -159,7 +116,7 @@ export const PoliceCaseDetailsForm: React.FC<PoliceCaseDetailsFormProps> = ({
             type="date"
             value={value.date}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setField("date", e.target.value)}
-            onBlur={() => touch("date")}
+            onBlur={() => setTouched((t) => ({ ...t, date: true }))}
             error={!!err("date")}
             helperText={err("date") ? "Required" : " "}
             disabled={disabled}
@@ -171,7 +128,7 @@ export const PoliceCaseDetailsForm: React.FC<PoliceCaseDetailsFormProps> = ({
             type="time"
             value={value.time}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => setField("time", e.target.value)}
-            onBlur={() => touch("time")}
+            onBlur={() => setTouched((t) => ({ ...t, time: true }))}
             error={!!err("time")}
             helperText={err("time") ? "Required" : " "}
             disabled={disabled}
@@ -180,35 +137,62 @@ export const PoliceCaseDetailsForm: React.FC<PoliceCaseDetailsFormProps> = ({
           />
         </Stack>
 
-        <TextField
-          label="Incident Type"
-          value={value.incidentType}
-          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setField("incidentType", e.target.value)}
-          onBlur={() => touch("incidentType")}
-          error={!!err("incidentType")}
-          helperText={err("incidentType") ? "Required" : " "}
+        <Autocomplete
+          options={[...officers.map((o) => o.name), "+ Add New Officer"]}
+          value={value.assignedOfficer}
+          onChange={(event, newValue) => {
+            if (newValue === "+ Add New Officer") {
+              handleAddNewOfficer();
+            } else {
+              setField("assignedOfficer", newValue || "");
+            }
+          }}
+          renderInput={(params) => <TextField {...params} label="Arresting Officer" fullWidth />}
           disabled={disabled}
-          fullWidth
+        />
+
+        <Autocomplete
+          options={[...officers.map((o) => o.name), "+ Add New Officer"]}
+          value={value.administeringOfficer}
+          onChange={(event, newValue) => {
+            if (newValue === "+ Add New Officer") {
+              handleAddNewOfficer();
+            } else {
+              setField("administeringOfficer", newValue || "");
+            }
+          }}
+          renderInput={(params) => <TextField {...params} label="Administering Officer" fullWidth />}
+          disabled={disabled}
+        />
+
+        <Autocomplete
+          freeSolo
+          options={incidentTypes}
+          filterOptions={(options, params) => {
+            const filtered = filter(options, params);
+
+            // Suggest the input value if it doesn't exist in the options
+            if (params.inputValue !== "" && !options.includes(params.inputValue)) {
+              filtered.push(params.inputValue);
+            }
+
+            return filtered;
+          }}
+          value={value.incidentType}
+          onChange={(_, newValue) => {
+            setField("incidentType", newValue || "");
+          }}
+          renderInput={(params) => <TextField {...params} label="Incident Type" fullWidth />}
+          disabled={disabled}
         />
 
         <TextField
           label="Location"
           value={value.location}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setField("location", e.target.value)}
-          onBlur={() => touch("location")}
+          onBlur={() => setTouched((t) => ({ ...t, location: true }))}
           error={!!err("location")}
           helperText={err("location") ? "Required" : " "}
-          disabled={disabled}
-          fullWidth
-        />
-
-        <TextField
-          label="Contact Number"
-          value={value.contactNumber}
-          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setField("contactNumber", e.target.value)}
-          onBlur={() => touch("contactNumber")}
-          error={!!err("contactNumber")}
-          helperText={err("contactNumber") ? "Required" : " "}
           disabled={disabled}
           fullWidth
         />
@@ -231,13 +215,12 @@ export const PoliceCaseDetailsForm: React.FC<PoliceCaseDetailsFormProps> = ({
             label="Priority"
             value={value.priority}
             onChange={(e: React.ChangeEvent<{ value: unknown }>) => setField("priority", e.target.value as CasePriority)}
-            onBlur={() => touch("priority")}
+            onBlur={() => setTouched((t) => ({ ...t, priority: true }))}
           >
             {priorities.map((p) => (
               <MenuItem key={p} value={p}>{p}</MenuItem>
             ))}
           </Select>
-          <FormHelperText>{err("priority") ? "Required" : " "}</FormHelperText>
         </FormControl>
 
         <TextField

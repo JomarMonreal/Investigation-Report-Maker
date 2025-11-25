@@ -8,7 +8,6 @@ export interface PoliceCaseDetails {
   incidentType: string;
   location: string;
   reportingPerson: string;
-  contactNumber: string;
   involvedParties: string;  // comma- or newline-separated
   assignedOfficer: string;
   badgeNumber: string;
@@ -19,6 +18,7 @@ export interface PoliceCaseDetails {
   arrestingOfficerAge: number;
   arrestingOfficerStation: string;
   arrestingOfficerHomeAddress: string;
+  arrestingOfficerContactNumber: string;
   currentDate: string; // ISO date (YYYY-MM-DD)
   administeringOfficer: string;
 
