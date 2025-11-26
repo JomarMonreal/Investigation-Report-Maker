@@ -70,7 +70,7 @@ const ReportCreation: React.FC = () => {
       }).then(res => res.json());
 
 
-      const test = JSON.parse(response.message.content).elements
+      const test = JSON.parse(response.message.content)
       // const nodes = policeReportSummary as unknown as Descendant[];
       const nodes = test as unknown as Descendant[];
 
