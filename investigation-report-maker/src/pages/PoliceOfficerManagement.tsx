@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Box,
   Button,
@@ -11,56 +11,97 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Paper
+  Paper,
+  Autocomplete,
 } from "@mui/material";
-import { usePoliceOfficerContext } from "../context/PoliceOfficerContext"; // Import the context
-import { Save } from "@mui/icons-material";
+import { usePoliceOfficer } from "../hooks/usePoliceOfficer";
+import type { Officer, Sex } from "../types/CaseDatails";
+
+const ranks = [
+  // Commissioned Officers
+  "Police General (PGEN)",
+  "Police Lieutenant General (PLTGEN)",
+  "Police Major General (PMGEN)",
+  "Police Brigadier General (PBGEN)",
+  "Police Colonel (PCOL)",
+  "Police Lieutenant Colonel (PLTCOL)",
+  "Police Major (PMAJ)",
+  "Police Captain (PCPT)",
+  "Police Lieutenant (PLT)",
+  // Non-Commissioned Officers
+  "Police Executive Master Sergeant (PEMS)",
+  "Police Chief Master Sergeant (PCMS)",
+  "Police Senior Master Sergeant (PSMS)",
+  "Police Master Sergeant (PMSg)",
+  "Police Staff Sergeant (PSSg)",
+  "Police Corporal (PCpl)",
+  "Patrolman / Patrolwoman (Pat)",
+];
+
+const sexes: Sex[] = ["Male", "Female", "Other", "PreferNotToSay"];
 
 const PoliceOfficerManagement: React.FC = () => {
-  const { officers, addOfficer, updateOfficer, deleteOfficer } = usePoliceOfficerContext(); // Use context
-  const [form, setForm] = useState<{
-    name: string;
-    age: number;
-    station: string;
-    homeAddress: string;
-    rank: string;
-    contactNumber: string;
-  }>({
-    name: "",
-    age: 0,
-    station: "",
-    homeAddress: "",
-    rank: "",
-    contactNumber: ""
+  const { officers, addOfficer, updateOfficer, deleteOfficer } = usePoliceOfficer(); // Use context
+  const [form, setForm] = useState<Officer>({
+    fullName: "",
+    rankOrPosition: "",
+    unitOrStation: "",
+    contactNumber: "",
+    badgeNumber: "",
+    age: undefined,
+    dateOfBirth: undefined,
+    sex: undefined,
+    citizenship: undefined,
+    civilStatus: undefined,
+    address: "",
+    email: undefined,
   });
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingBadgeNumber, setEditingBadgeNumber] = useState<string | null>(null);
 
-  const handleInputChange = (field: keyof typeof form, value: string | number) => {
+  const handleInputChange = (field: keyof Officer, value: string) => {
     setForm({ ...form, [field]: value });
   };
 
   const handleAddOrUpdateOfficer = () => {
-    if (editingId !== null) {
-      updateOfficer(editingId, form);
-      setEditingId(null);
+    if (editingBadgeNumber !== null) {
+      updateOfficer(editingBadgeNumber, form);
+      setEditingBadgeNumber(null);
     } else {
       addOfficer(form);
     }
-    setForm({ name: "", age: 0, station: "", homeAddress: "", rank: "", contactNumber: "" });
+    setForm({
+      fullName: "",
+      rankOrPosition: "",
+      unitOrStation: "",
+      contactNumber: "",
+      badgeNumber: "",
+      age: undefined,
+      dateOfBirth: undefined,
+      sex: undefined,
+      citizenship: undefined,
+      civilStatus: undefined,
+      address: "",
+      email: undefined,
+    });
   };
 
   const handleSaveToLocalStorage = () => {
     localStorage.setItem("officers", JSON.stringify(officers));
-    alert("Officers data saved to local storage.");
   };
 
-  const handleEditOfficer = (id: number) => {
-    const officer = officers.find((o) => o.id === id);
+  const handleEditOfficer = (badgeNumber: string) => {
+    const officer = officers.find((o) => o.badgeNumber === badgeNumber);
     if (officer) {
-      setForm({ name: officer.name, age: officer.age, station: officer.station, homeAddress: officer.homeAddress, rank: officer.rank, contactNumber: officer.contactNumber });
-      setEditingId(id);
+      setForm(officer);
+      setEditingBadgeNumber(badgeNumber);
     }
   };
+
+  // save every time officers change
+  useEffect(() => {
+    handleSaveToLocalStorage();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [officers]); 
 
   return (
     <Box p={3}>
@@ -70,34 +111,55 @@ const PoliceOfficerManagement: React.FC = () => {
 
       <Stack spacing={2} mb={3}>
         <TextField
-          label="Name"
-          value={form.name}
-          onChange={(e) => handleInputChange("name", e.target.value)}
+          label="Full Name"
+          value={form.fullName}
+          onChange={(e) => handleInputChange("fullName", e.target.value)}
+          fullWidth
+        />
+        <Autocomplete
+          options={ranks}
+          value={form.rankOrPosition}
+          onChange={(_, newValue) => handleInputChange("rankOrPosition", newValue || "")}
+          renderInput={(params) => <TextField {...params} label="Rank or Position" fullWidth />}
+        />
+        <TextField
+          label="Unit or Station"
+          value={form.unitOrStation}
+          onChange={(e) => handleInputChange("unitOrStation", e.target.value)}
+          fullWidth
+        />
+        
+        <TextField
+          label="Badge Number"
+          value={form.badgeNumber}
+          onChange={(e) => handleInputChange("badgeNumber", e.target.value)}
           fullWidth
         />
         <TextField
-          label="Age"
-          type="number"
-          value={form.age}
-          onChange={(e) => handleInputChange("age", Number(e.target.value))}
+          label="Date of Birth"
+          type="date"
+          value={form.dateOfBirth || ""}
+          onChange={(e) => handleInputChange("dateOfBirth", e.target.value)}
+          fullWidth
+          InputLabelProps={{ shrink: true }}
+        />
+        <Autocomplete
+          options={sexes}
+          value={form.sex || ""}
+          onChange={(_, newValue) => handleInputChange("sex", newValue || "")}
+          renderInput={(params) => <TextField {...params} label="Sex" fullWidth />}
+        />
+        <TextField
+          label="Address"
+          value={form.address}
+          onChange={(e) => handleInputChange("address", e.target.value)}
           fullWidth
         />
         <TextField
-          label="Station"
-          value={form.station}
-          onChange={(e) => handleInputChange("station", e.target.value)}
-          fullWidth
-        />
-        <TextField
-          label="Home Address"
-          value={form.homeAddress}
-          onChange={(e) => handleInputChange("homeAddress", e.target.value)}
-          fullWidth
-        />
-        <TextField
-          label="Rank"
-          value={form.rank}
-          onChange={(e) => handleInputChange("rank", e.target.value)}
+          label="Email"
+          type="email"
+          value={form.email || ""}
+          onChange={(e) => handleInputChange("email", e.target.value)}
           fullWidth
         />
         <TextField
@@ -107,10 +169,7 @@ const PoliceOfficerManagement: React.FC = () => {
           fullWidth
         />
         <Button variant="contained" color="primary" onClick={handleAddOrUpdateOfficer}>
-          {editingId !== null ? "Update Officer" : "Add Officer"}
-        </Button>
-        <Button variant="contained" color="secondary" onClick={handleSaveToLocalStorage} startIcon={<Save />}>
-          Save Officers
+          {editingBadgeNumber !== null ? "Update Officer" : "Add Officer"}
         </Button>
       </Stack>
 
@@ -118,37 +177,44 @@ const PoliceOfficerManagement: React.FC = () => {
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell>Name</TableCell>
-              <TableCell>Age</TableCell>
-              <TableCell>Station</TableCell>
-              <TableCell>Home Address</TableCell>
-              <TableCell>Rank</TableCell>
+              <TableCell>Full Name</TableCell>
+              <TableCell>Rank or Position</TableCell>
+              <TableCell>Unit or Station</TableCell>
+              <TableCell>Badge Number</TableCell>
+              <TableCell>Date of Birth</TableCell>
+              <TableCell>Sex</TableCell>
+              <TableCell>Address</TableCell>
+              <TableCell>Email</TableCell>
               <TableCell>Contact Number</TableCell>
               <TableCell>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {officers.map((officer) => (
-              <TableRow key={officer.id}>
-                <TableCell>{officer.name}</TableCell>
-                <TableCell>{officer.age}</TableCell>
-                <TableCell>{officer.station}</TableCell>
-                <TableCell>{officer.homeAddress}</TableCell>
-                <TableCell>{officer.rank}</TableCell>
+              <TableRow key={officer.badgeNumber}>
+                <TableCell>{officer.fullName}</TableCell>
+                <TableCell>{officer.rankOrPosition}</TableCell>
+                <TableCell>{officer.unitOrStation}</TableCell>
+                <TableCell>{officer.badgeNumber}</TableCell>
+                <TableCell>{officer.dateOfBirth || "N/A"}</TableCell>
+                <TableCell>{officer.sex || "N/A"}</TableCell>
+                <TableCell>{officer.address}</TableCell>
+                <TableCell>{officer.email || "N/A"}</TableCell>
                 <TableCell>{officer.contactNumber}</TableCell>
-                <TableCell>
+                <TableCell align="center">
                   <Button
                     variant="outlined"
                     color="primary"
-                    onClick={() => handleEditOfficer(officer.id)}
-                    sx={{ marginRight: 1 }}
+                    onClick={() => handleEditOfficer(officer.badgeNumber)}
+                    sx={{ width: '100%'}}
                   >
                     Edit
                   </Button>
                   <Button
                     variant="outlined"
                     color="error"
-                    onClick={() => deleteOfficer(officer.id)}
+                    onClick={() => deleteOfficer(officer.badgeNumber)}
+                    sx={{ width: '100%'}}
                   >
                     Delete
                   </Button>

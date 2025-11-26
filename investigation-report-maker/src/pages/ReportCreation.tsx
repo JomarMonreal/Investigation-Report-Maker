@@ -5,11 +5,11 @@ import { createEditor, Editor, Transforms, type Descendant } from "slate";
 import type { CustomElement } from "../utils/slateHelpers";
 import EditorComponent from "../components/Editor/EditorComponent";
 import DocScaffoldLoad, { type ReportView } from "../components/DocScaffoldLoad";
-import { PoliceCaseDetailsForm } from "../components/PoliceCaseDetailsForm";
 import type { PoliceCaseDetails } from "../types/PoliceCaseDetails";
 import { policeReportSummary, systemPrompt } from "../utils/dummy";
 import { Menu, MenuItem, IconButton } from "@mui/material";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
+import CaseDetailsForm from '../components/CaseDetailsForm';
 
 const ReportCreation: React.FC = () => {
   const [title, setTitle] = React.useState<string>("Untitled Report");
@@ -40,7 +40,6 @@ const ReportCreation: React.FC = () => {
     arrestingOfficerStation: "",
     arrestingOfficerHomeAddress: "",
     arrestingOfficerContactNumber: "",
-    currentDate: "",
     administeringOfficer: "",
     suspectName: "",
     suspectOccupation: "",
@@ -63,15 +62,16 @@ const ReportCreation: React.FC = () => {
   const handleGenerateReport = React.useCallback(async () => {
     try {
       // For now we ignore templateCache; you can merge or apply it here if desired.
-      const response = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ details, systemPrompt })
-      }).then(res => res.json());
+      // const response = await fetch("/api/generate", {
+      //   method: "POST",
+      //   headers: { "Content-Type": "application/json" },
+      //   body: JSON.stringify({ details, systemPrompt })
+      // }).then(res => res.json());
 
 
-      const test = JSON.parse(response.message.content)
-      const nodes = test as unknown as Descendant[];
+      // const test = JSON.parse(response.message.content)
+      // const nodes = test as unknown as Descendant[];
+      const nodes = policeReportSummary as unknown as Descendant[];
 
       Editor.withoutNormalizing(resultEditor, () => {
         Transforms.select(resultEditor, { anchor: Editor.start(resultEditor, []), focus: Editor.end(resultEditor, []) });
@@ -157,7 +157,7 @@ const ReportCreation: React.FC = () => {
         onLoadError={handleLoadError}
         onGenerateReport={handleGenerateReport}
         resultContent={<EditorComponent editor={resultEditor} />}
-        detailsContent={<PoliceCaseDetailsForm value={details} onChange={setDetails} />}
+        detailsContent={<CaseDetailsForm />}
         moreOptions={
           <>
             <input

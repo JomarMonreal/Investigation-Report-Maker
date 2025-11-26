@@ -19,7 +19,6 @@ export interface PoliceCaseDetails {
   arrestingOfficerStation: string;
   arrestingOfficerHomeAddress: string;
   arrestingOfficerContactNumber: string;
-  currentDate: string; // ISO date (YYYY-MM-DD)
   administeringOfficer: string;
 
   suspectName: string;

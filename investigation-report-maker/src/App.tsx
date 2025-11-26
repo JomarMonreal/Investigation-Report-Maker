@@ -1,4 +1,3 @@
-import { PoliceOfficerProvider } from "./context/PoliceOfficerContext"; // Import the provider
 import ArticleIcon from "@mui/icons-material/Article";
 import DescriptionIcon from "@mui/icons-material/Description";
 import HomeIcon from "@mui/icons-material/Home";
@@ -17,48 +16,53 @@ import Home from "./pages/Home";
 import ReportCreation from "./pages/ReportCreation";
 import TemplateCreation from "./pages/TemplateCreation";
 import PoliceOfficerManagement from "./pages/PoliceOfficerManagement"; // Import the new page
+import { PoliceOfficerProvider } from "./context/PoliceOfficerProvider";
+import CaseDetailsProvider from "./context/CaseDetailsProvider";
 
 const App: React.FC = () => {
   const navigate = useNavigate();
 
   return (
-    <PoliceOfficerProvider> {/* Wrap the app in the provider */}
-      <Box sx={{ minHeight: "100dvh", display: "flex", flexDirection: "column" }}>
-        <AppBar position="sticky" elevation={0} color="inherit" sx={{ borderBottom: 1, borderColor: "divider" }}>
-          <Toolbar sx={{ gap: 1 }}>
-            <Tooltip title="Home">
-              <IconButton color="primary" onClick={() => navigate("/")}>
-                <HomeIcon />
-              </IconButton>
-            </Tooltip>
-            <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 700 }}>
-              Police Report Maker
-            </Typography>
-            <Typography variant="body1" sx={{ mr: 1, color: "text.secondary" }}>
-              Create templates and generate reports
-            </Typography>
-            <Tooltip title="Template Creation">
-              <IconButton onClick={() => navigate("/templates/new")}>
-                <DescriptionIcon />
-              </IconButton>
-            </Tooltip>
-            <Tooltip title="Report Creation">
-              <IconButton onClick={() => navigate("/reports/new")}>
-                <ArticleIcon />
-              </IconButton>
-            </Tooltip>
-          </Toolbar>
-        </AppBar>
+    <PoliceOfficerProvider> 
+      <CaseDetailsProvider>
 
-        <Container maxWidth="lg" sx={{ py: 4, flexGrow: 1, width: "100%" }}>
-          <Routes>
-            <Route element={<Home />} path="/" />
-            <Route element={<TemplateCreation />} path="/templates/new" />
-            <Route element={<ReportCreation />} path="/reports/new" />
-            <Route element={<PoliceOfficerManagement />} path="/police-officer-management" /> {/* Added route */}
-          </Routes>
-        </Container>
-      </Box>
+        <Box sx={{ minHeight: "100dvh", display: "flex", flexDirection: "column" }}>
+          <AppBar position="sticky" elevation={0} color="inherit" sx={{ borderBottom: 1, borderColor: "divider" }}>
+            <Toolbar sx={{ gap: 1 }}>
+              <Tooltip title="Home">
+                <IconButton color="primary" onClick={() => navigate("/")}>
+                  <HomeIcon />
+                </IconButton>
+              </Tooltip>
+              <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 700 }}>
+                Police Report Maker
+              </Typography>
+              <Typography variant="body1" sx={{ mr: 1, color: "text.secondary" }}>
+                Create templates and generate reports
+              </Typography>
+              <Tooltip title="Template Creation">
+                <IconButton onClick={() => navigate("/templates/new")}>
+                  <DescriptionIcon />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="Report Creation">
+                <IconButton onClick={() => navigate("/reports/new")}>
+                  <ArticleIcon />
+                </IconButton>
+              </Tooltip>
+            </Toolbar>
+          </AppBar>
+
+          <Container maxWidth="lg" sx={{ py: 4, flexGrow: 1, width: "100%" }}>
+            <Routes>
+              <Route element={<Home />} path="/" />
+              <Route element={<TemplateCreation />} path="/templates/new" />
+              <Route element={<ReportCreation />} path="/reports/new" />
+              <Route element={<PoliceOfficerManagement />} path="/police-officer-management" /> {/* Added route */}
+            </Routes>
+          </Container>
+        </Box>
+      </CaseDetailsProvider>
     </PoliceOfficerProvider>
   );
 };
