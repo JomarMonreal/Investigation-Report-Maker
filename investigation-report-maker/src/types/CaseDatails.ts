@@ -7,7 +7,7 @@ export type CasePriority = "Low" | "Medium" | "High" | "Critical";
 export type IsoDate = `${number}-${number}-${number}`;        // e.g. "2025-11-26"
 export type Time24h = `${number}:${number}`;                  // e.g. "14:30"
 
-export type Sex = "Male" | "Female" | "Other" | "PreferNotToSay";
+export type Sex = "Male" | "Female" | "Other" | "Prefer Not To Say";
 
 export type CivilStatus =
   | "Single"
@@ -20,7 +20,8 @@ export type ArrestType =
   | "Warrant"
   | "InFlagranteDelicto"
   | "HotPursuit"
-  | "VoluntarySurrender";
+  | "VoluntarySurrender"
+  | "Not yet arrested";
 
 export type WitnessType =
   | "CivilianEyewitness"

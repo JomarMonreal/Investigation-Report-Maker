@@ -502,24 +502,6 @@ const CaseDetailsForm: React.FC = () => {
           />
         </Box>
 
-        {/* Operation details -------------------------------------------------- */}
-        <Box className={css.section}>
-          <SectionHeader title="Pre-Operation / Buy-Bust Details" />
-          <PreOperationDetailsForm
-            preOperationDetails={caseDetails.preOperationDetails}
-            onChange={handlePreOperationDetailsChange}
-          />
-        </Box>
-
-        {/* Arrest and post-arrest details ------------------------------------ */}
-        <Box className={css.section}>
-          <SectionHeader title="Arrest and Post-Arrest Details" />
-          <ArrestDetailsForm
-            arrestDetails={caseDetails.arrestDetails}
-            onChange={handleArrestDetailsChange}
-          />
-        </Box>
-
         {/* Evidence ----------------------------------------------------------- */}
         <Box className={css.section}>
           <SectionHeader
@@ -636,6 +618,24 @@ const CaseDetailsForm: React.FC = () => {
               </Box>
             ))}
           </Stack>
+        </Box>
+
+        {/* Operation details -------------------------------------------------- */}
+        <Box className={css.section}>
+          <SectionHeader title="Pre-Operation / Buy-Bust Details" />
+          <PreOperationDetailsForm
+            preOperationDetails={caseDetails.preOperationDetails}
+            onChange={handlePreOperationDetailsChange}
+          />
+        </Box>
+
+        {/* Arrest and post-arrest details ------------------------------------ */}
+        <Box className={css.section}>
+          <SectionHeader title="Arrest and Post-Arrest Details" />
+          <ArrestDetailsForm
+            arrestDetails={caseDetails.arrestDetails}
+            onChange={handleArrestDetailsChange}
+          />
         </Box>
       </Stack>
     </Box>

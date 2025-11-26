@@ -1,3 +1,4 @@
+import { Person } from "@mui/icons-material";
 import ArticleIcon from "@mui/icons-material/Article";
 import DescriptionIcon from "@mui/icons-material/Description";
 import {
@@ -113,7 +114,7 @@ const Home: React.FC = () => {
           >
             <CardContent sx={{ p: 0 }}>
               <Stack direction="row" spacing={2} alignItems="flex-start">
-                <DescriptionIcon fontSize="large" color="primary" />
+                <Person fontSize="large" color="primary" />
                 <Stack>
                   <Typography variant="h6" sx={{ fontWeight: 700 }}>
                     Manage Police Officers

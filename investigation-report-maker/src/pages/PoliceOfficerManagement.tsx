@@ -38,7 +38,7 @@ const ranks = [
   "Patrolman / Patrolwoman (Pat)",
 ];
 
-const sexes: Sex[] = ["Male", "Female", "Other", "PreferNotToSay"];
+const sexes: Sex[] = ["Male", "Female", "Other", "Prefer Not To Say"];
 
 const PoliceOfficerManagement: React.FC = () => {
   const { officers, addOfficer, updateOfficer, deleteOfficer } = usePoliceOfficer(); // Use context

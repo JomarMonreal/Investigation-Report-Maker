@@ -1,12 +1,10 @@
 import FolderOpenIcon from "@mui/icons-material/FolderOpen";
-import MoreVertIcon from "@mui/icons-material/MoreVert";
 import DescriptionIcon from "@mui/icons-material/Description";
 import CloseIcon from "@mui/icons-material/Close";
 import {
   Box,
   Button,
   Chip,
-  IconButton,
   InputBase,
   Paper,
   Stack,

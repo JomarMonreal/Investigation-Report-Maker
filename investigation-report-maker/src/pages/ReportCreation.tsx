@@ -1,4 +1,3 @@
-import ollama from 'ollama'
 import * as React from "react";
 import { Slate, withReact } from "slate-react";
 import { createEditor, Editor, Transforms, type Descendant } from "slate";
@@ -6,7 +5,7 @@ import type { CustomElement } from "../utils/slateHelpers";
 import EditorComponent from "../components/Editor/EditorComponent";
 import DocScaffoldLoad, { type ReportView } from "../components/DocScaffoldLoad";
 import type { PoliceCaseDetails } from "../types/PoliceCaseDetails";
-import { policeReportSummary, systemPrompt } from "../utils/dummy";
+import { policeReportSummary } from "../utils/dummy";
 import { Menu, MenuItem, IconButton } from "@mui/material";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import CaseDetailsForm from '../components/CaseDetailsForm';
