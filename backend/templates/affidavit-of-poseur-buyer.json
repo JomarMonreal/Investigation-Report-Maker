@@ -1,0 +1,161 @@
+[
+  {
+    "type": "paragraph",
+    "children": [
+      {
+        "text": "Lalawigan ng",
+        "bold": true
+      }
+    ]
+  },
+  {
+    "type": "paragraph",
+    "children": [
+      {
+        "text": "Bayan ng Mansalay"
+      }
+    ]
+  },
+  {
+    "type": "paragraph",
+    "children": [
+      {
+        "text": "x -------------------------------- x"
+      }
+    ]
+  },
+  {
+    "type": "paragraph",
+    "children": [
+      {
+        "text": "SINUMPAANG SALAYSAY",
+        "bold": true,
+        "underline": true
+      }
+    ],
+    "align": "center"
+  },
+  {
+    "type": "paragraph",
+    "align": "center",
+    "children": [
+      {
+        "text": "(Affidavit of Poseur Buyer)"
+      }
+    ]
+  },
+  {
+    "type": "paragraph",
+    "align": "justify",
+    "children": [
+      {
+        "text": "AKO, {{ARRESTING_OFFICER_NAME}} {{ARRESTING_OFFICER_AGE}} taong-gulang, kagawad ng Pulisya at nakatalaga sa {{ARRESTING_OFFICER_STATION}}, naninirahan sa {{ARRESTING_OFFICER_HOME_ADDRESS}}, matapos na makapanumpa alinsunod sa ipinag-uutos ng Saligang Batas ng Plilipinas ay malaya at kusang loob na nagsasalaysay gaya ng mga sumusunod:"
+      }
+    ]
+  },
+  {
+    "type": "paragraph",
+    "align": "justify",
+    "children": [
+      {
+        "text": "{{Narration}}"
+      }
+    ]
+  },
+  {
+    "type": "paragraph",
+    "align": "justify",
+    "children": [
+      {
+        "text": ""
+      }
+    ]
+  },
+  {
+    "type": "paragraph",
+    "align": "justify",
+    "children": [
+      {
+        "text": "SA KATUNAYAN NG LAHAT",
+        "bold": true
+      },
+      {
+        "text": " ay lumagda ako ng aking pangalan at apelyido ngayong ika-{{DAY}} ng {{MONTH}} {{YEAR}} dito sa {{LOCATION}}."
+      }
+    ]
+  },
+  {
+    "type": "paragraph",
+    "align": "left",
+    "children": [
+      {
+        "text": ""
+      }
+    ]
+  },
+  {
+    "type": "paragraph",
+    "align": "right",
+    "children": [
+      {
+        "text": "{{ARRESTING_OFFICER_NAME}}"
+      }
+    ]
+  },
+  {
+    "type": "paragraph",
+    "align": "right",
+    "children": [
+      {
+        "text": "(Nagsalaysay)"
+      }
+    ]
+  },
+  {
+    "type": "paragraph",
+    "align": "center",
+    "children": [
+      {
+        "text": "CERTIFICATION",
+        "underline": true,
+        "bold": true
+      }
+    ]
+  },
+  {
+    "type": "paragraph",
+    "align": "justify",
+    "children": [
+      {
+        "text": "SWORN AND SUBSCRIBED TO BEFORE ME this {{DAY}} day of {{MONTH}} {{YEAR}} at {{LOCATION}} and further certify that I personally examined the affaint and that I am fully satisfied that she voluntarily executed and understood the contents of the foregoing statements."
+      }
+    ]
+  },
+  {
+    "type": "paragraph",
+    "align": "left",
+    "children": [
+      {
+        "text": ""
+      }
+    ]
+  },
+  {
+    "type": "paragraph",
+    "align": "right",
+    "children": [
+      {
+        "text": "{{ADMINISTERING_OFFICER_NAME}}"
+      }
+    ]
+  },
+  {
+    "type": "paragraph",
+    "align": "right",
+    "children": [
+      {
+        "text": "Administering Officer"
+      }
+    ]
+  }
+]
