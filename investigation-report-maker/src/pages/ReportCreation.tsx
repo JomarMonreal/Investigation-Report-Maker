@@ -8,6 +8,8 @@ import DocScaffoldLoad, { type ReportView } from "../components/DocScaffoldLoad"
 import { PoliceCaseDetailsForm } from "../components/PoliceCaseDetailsForm";
 import type { PoliceCaseDetails } from "../types/PoliceCaseDetails";
 import { policeReportSummary, systemPrompt } from "../utils/dummy";
+import { Menu, MenuItem, IconButton } from "@mui/material";
+import MoreVertIcon from "@mui/icons-material/MoreVert";
 
 const ReportCreation: React.FC = () => {
   const [title, setTitle] = React.useState<string>("Untitled Report");
@@ -21,48 +23,46 @@ const ReportCreation: React.FC = () => {
 
   // Details form
   const [details, setDetails] = React.useState<PoliceCaseDetails>({
-    assignedOfficer: "",
-    badgeNumber: "",
     caseNumber: "",
     caseTitle: "",
-    contactNumber: "",
     date: "",
-    evidenceSummary: "",
+    time: "",
     incidentType: "",
-    involvedParties: "",
     location: "",
-    narrative: "",
-    priority: "Low",
     reportingPerson: "",
-    time: ""
+    involvedParties: "",
+    assignedOfficer: "",
+    badgeNumber: "",
+    priority: "Low",
+    evidenceSummary: "",
+    narrative: "",
+    arrestingOfficerAge: 0,
+    arrestingOfficerStation: "",
+    arrestingOfficerHomeAddress: "",
+    arrestingOfficerContactNumber: "",
+    currentDate: "",
+    administeringOfficer: "",
+    suspectName: "",
+    suspectOccupation: "",
+    suspectHomeAddress: "",
+    suspectEvents: "",
+    officerEvents: []
   });
 
-  // NEW: cache the last loaded template (do not auto-apply)
-  const [templateCache, setTemplateCache] = React.useState<CustomElement[] | null>(null);
-
   const handleLoadTemplate = React.useCallback(
-    (template: CustomElement[], _info: { filename: string }) => {
-      setTemplateCache(template); // store only
+    () => {
+      // store only
     },
     []
   );
 
   const handleClearTemplateCache = React.useCallback(() => {
-    setTemplateCache(null);
+    // reset cache when chip x is clicked
   }, []);
 
   const handleGenerateReport = React.useCallback(async () => {
     try {
       // For now we ignore templateCache; you can merge or apply it here if desired.
-      
-      // const response = await ollama.chat({
-      //   model: 'gemma3:27b',
-      //   format: 'json',
-      //   messages: [
-      //     {role: 'system', content: systemPrompt},
-      //     {role: 'user', content: JSON.stringify(details)}
-      //   ]
-      // })
       const response = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -71,7 +71,6 @@ const ReportCreation: React.FC = () => {
 
 
       const test = JSON.parse(response.message.content)
-      // const nodes = policeReportSummary as unknown as Descendant[];
       const nodes = test as unknown as Descendant[];
 
       Editor.withoutNormalizing(resultEditor, () => {
@@ -95,19 +94,95 @@ const ReportCreation: React.FC = () => {
     alert(`Template import failed: ${message}`);
   }, []);
 
+  const [menuAnchor, setMenuAnchor] = React.useState<null | HTMLElement>(null);
+
+  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+    setMenuAnchor(event.currentTarget);
+  };
+
+  const handleMenuClose = () => {
+    setMenuAnchor(null);
+  };
+
+  const handleSaveCaseDetails = () => {
+    const fileName = `${title || "case-details"}.json`;
+    const json = JSON.stringify(details, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName;
+    link.click();
+
+    URL.revokeObjectURL(url);
+    alert("Case details saved as JSON file.");
+    handleMenuClose();
+  };
+
+  const handleLoadCaseDetails = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const json = JSON.parse(reader.result as string);
+        setDetails(json);
+        alert("Case details loaded successfully.");
+      } catch {
+        alert("Failed to load case details. Ensure the file is a valid JSON.");
+      }
+    };
+    reader.onerror = () => {
+      alert("Could not read the file.");
+    };
+    reader.readAsText(file);
+    event.target.value = ""; // Reset the input value to allow reloading the same file
+  };
+
   return (
-    <Slate editor={resultEditor} initialValue={resultValue} onChange={setResultValue}>
+    <Slate
+      editor={resultEditor}
+      initialValue={resultValue}
+      onChange={(value) => setResultValue(value as CustomElement[])}
+    >
       <DocScaffoldLoad
         title={title}
         view={view}
         onViewChange={setView}
         onTitleChange={setTitle}
         onLoadTemplate={handleLoadTemplate}
-        onClearPickedTemplate={handleClearTemplateCache} // ⟵ reset cache when chip x is clicked
+        onClearPickedTemplate={handleClearTemplateCache}
         onLoadError={handleLoadError}
         onGenerateReport={handleGenerateReport}
         resultContent={<EditorComponent editor={resultEditor} />}
         detailsContent={<PoliceCaseDetailsForm value={details} onChange={setDetails} />}
+        moreOptions={
+          <>
+            <input
+              type="file"
+              accept="application/json"
+              style={{ display: "none" }}
+              id="load-case-details"
+              onChange={handleLoadCaseDetails}
+            />
+
+            <IconButton onClick={handleMenuOpen} aria-label="more options">
+              <MoreVertIcon />
+            </IconButton>
+            <Menu
+              anchorEl={menuAnchor}
+              open={Boolean(menuAnchor)}
+              onClose={handleMenuClose}
+            >
+              <MenuItem onClick={handleSaveCaseDetails}>Save Case Report Detail</MenuItem>
+              <label htmlFor="load-case-details">
+                <MenuItem component="span">Load Case Report Detail</MenuItem>
+              </label>
+            </Menu>
+          </>
+        }
       />
     </Slate>
   );

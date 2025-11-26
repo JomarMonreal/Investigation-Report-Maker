@@ -36,6 +36,8 @@ export interface DocScaffoldLoadProps {
 
   readonly view?: ReportView;
   readonly onViewChange?: (next: ReportView) => void;
+
+  moreOptions?: React.ReactNode; // New prop for additional menu options
 }
 
 const DocScaffoldLoad: React.FC<DocScaffoldLoadProps> = ({
@@ -49,7 +51,8 @@ const DocScaffoldLoad: React.FC<DocScaffoldLoadProps> = ({
   onClearPickedTemplate,
   onGenerateReport,
   view,
-  onViewChange
+  onViewChange,
+  moreOptions // Destructure the new prop
 }) => {
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
 
@@ -76,12 +79,12 @@ const DocScaffoldLoad: React.FC<DocScaffoldLoadProps> = ({
     const data = JSON.parse(text);
     if (!Array.isArray(data)) throw new Error("Template root must be an array.");
     const ok = data.every(
-      (el) =>
+      (el: { type: string; children: CustomElement[] }) =>
         typeof el === "object" &&
         el !== null &&
         "type" in el &&
         "children" in el &&
-        Array.isArray((el as any).children)
+        Array.isArray(el.children)
     );
     if (!ok) throw new Error("Template shape is invalid for Slate.");
     return data as CustomElement[];
@@ -199,11 +202,8 @@ const DocScaffoldLoad: React.FC<DocScaffoldLoadProps> = ({
             </>
           )}
 
-          <Tooltip title="More">
-            <IconButton aria-label="More actions">
-              <MoreVertIcon />
-            </IconButton>
-          </Tooltip>
+          {moreOptions && <div>{moreOptions}</div>} {/* Render additional menu options if provided */}
+
         </Stack>
       </Stack>
 
@@ -216,6 +216,7 @@ const DocScaffoldLoad: React.FC<DocScaffoldLoadProps> = ({
           </Paper>
         </Box>
       </Stack>
+
     </Stack>
   );
 };
