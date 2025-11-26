@@ -7,8 +7,8 @@ export interface PoliceOfficerContextProps {
   addOfficer: (officer: Officer) => void;
   updateOfficer: (id: string, updatedOfficer: Omit<Officer, "badgeNumber">) => void;
   deleteOfficer: (id: string) => void;
+  officerByName: (name: string) => Officer | undefined; // Added to context props
 }
-
 
 export const PoliceOfficerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [officers, setOfficers] = useState<Officer[]>([]);
@@ -34,8 +34,12 @@ export const PoliceOfficerProvider: React.FC<{ children: React.ReactNode }> = ({
     setOfficers((prev) => prev.filter((officer) => officer.badgeNumber !== id));
   };
 
+  const officerByName = (name: string): Officer | undefined => {
+    return officers.find((officer) => officer.fullName.toLowerCase() === name.toLowerCase());
+  };
+
   return (
-    <PoliceOfficerContext.Provider value={{ officers, addOfficer, updateOfficer, deleteOfficer }}>
+    <PoliceOfficerContext.Provider value={{ officers, addOfficer, updateOfficer, deleteOfficer, officerByName }}>
       {children}
     </PoliceOfficerContext.Provider>
   );

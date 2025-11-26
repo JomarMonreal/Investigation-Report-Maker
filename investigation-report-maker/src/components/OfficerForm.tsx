@@ -17,11 +17,10 @@ type OfficerFormProps = {
 
 const OfficerForm: React.FC<OfficerFormProps> = ({ officer, onChange }) => {
     const navigate = useNavigate();
-  const { officers } = usePoliceOfficer();
+  const { officers, officerByName } = usePoliceOfficer();
   const handleAddNewOfficer = () => {
     navigate('/police-officer-management');
   };
-
 
   return (
     <Stack className={css.sectionFields} spacing={2}>
@@ -32,7 +31,8 @@ const OfficerForm: React.FC<OfficerFormProps> = ({ officer, onChange }) => {
           if (newValue === '+ Add New Officer') {
             handleAddNewOfficer();
           } else {
-            onChange({ ...officer, fullName: newValue || '' });
+            const selectedOfficer = officerByName(newValue || '');
+            onChange(selectedOfficer ? selectedOfficer : { ...officer });
           }
         }}
         renderInput={(params) => (

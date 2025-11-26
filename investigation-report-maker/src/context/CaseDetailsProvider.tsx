@@ -27,6 +27,7 @@ export const CaseDetailsProvider: React.FC<{ children: React.ReactNode }> = ({ c
       address: "",
       rankOrPosition: "",
       unitOrStation: "",
+      badgeNumber: "",
     },
     arrestingOfficers: [],
     evidence: [],

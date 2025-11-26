@@ -72,6 +72,7 @@ const CaseDetailsForm: React.FC = () => {
   };
 
   const handleAssignedOfficerChange = (updated: Officer): void => {
+    console.log(updated);
     handleCaseFieldChange('assignedOfficer', updated);
   };
 
