@@ -39,6 +39,7 @@ import PreOperationDetailsForm from './PreOpertationDetailForm';
 import ArrestDetailsForm from './ArrestDetailsForm';
 import EvidenceItemForm from './EvidenceItemForm';
 import OfficerEventForm from './OfficerEventForm';
+import PhilippineAddressForm from './PhilippineAddressForm';
 
 const CaseDetailsForm: React.FC = () => {
   const { caseDetails, setCaseDetails } = useCaseDetails();
@@ -320,20 +321,7 @@ const CaseDetailsForm: React.FC = () => {
               fullWidth
               size="small"
             />
-
-            <TextField
-              className={css.field}
-              label="Incident Location"
-              value={caseDetails.incidentLocation}
-              onChange={(event) =>
-                handleCaseFieldChange('incidentLocation', event.target.value)
-              }
-              fullWidth
-              size="small"
-              multiline
-              minRows={2}
-            />
-
+            
             <TextField
               className={css.field}
               label="Investigating Unit"
@@ -359,6 +347,11 @@ const CaseDetailsForm: React.FC = () => {
               <MenuItem value="High">High</MenuItem>
               <MenuItem value="Critical">Critical</MenuItem>
             </TextField>
+
+            <PhilippineAddressForm
+              address={caseDetails.incidentLocation}
+              onChange={(updated) => handleCaseFieldChange('incidentLocation', updated)}
+            />  
           </Stack>
         </Box>
 

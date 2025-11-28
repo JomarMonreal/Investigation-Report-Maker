@@ -149,7 +149,7 @@ export interface Person {
   address: string;
 
   /** Structured address components. */
-  completeAddress: PhilippineAddress;
+  completeAddress?: PhilippineAddress;
 
   /** Primary contact number, if available. */
   contactNumber?: string;
@@ -439,7 +439,7 @@ export interface CaseDetails {
   incidentType: string;
 
   /** Exact place of incident (address, landmarks, description). */
-  incidentLocation: string;
+  incidentLocation: PhilippineAddress;
 
   /** Station or unit handling the case (investigating unit). */
   investigatingUnit: string;
