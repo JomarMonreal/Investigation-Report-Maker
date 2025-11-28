@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
   Box,
   Button,
@@ -141,10 +141,6 @@ const PoliceOfficerManagement: React.FC = () => {
     });
   };
 
-  const handleSaveToLocalStorage = () => {
-    localStorage.setItem("officers", JSON.stringify(officers));
-  };
-
   const handleEditOfficer = (badgeNumber: string) => {
     const officer = officers.find((o) => o.badgeNumber === badgeNumber);
     if (officer) {
@@ -155,11 +151,6 @@ const PoliceOfficerManagement: React.FC = () => {
       setEditingBadgeNumber(badgeNumber);
     }
   };
-
-  useEffect(() => {
-    handleSaveToLocalStorage();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [officers]);
 
   return (
     <Box p={3}>
@@ -250,13 +241,6 @@ const PoliceOfficerManagement: React.FC = () => {
             handleInputChange("civilStatus", (newValue ?? undefined) as Officer["civilStatus"])
           }
           renderInput={(params) => <TextField {...params} label="Civil Status" fullWidth />}
-        />
-
-        <TextField
-          label="Address (Free-text)"
-          value={form.address}
-          onChange={(e) => handleInputChange("address", e.target.value)}
-          fullWidth
         />
 
         <Typography variant="h6" sx={{ mt: 2 }}>

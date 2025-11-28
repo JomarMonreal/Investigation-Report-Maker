@@ -24,6 +24,7 @@ import { useCaseDetails } from "../hooks/useCaseDetails";
 import type { CaseDetails, Officer } from "../types/CaseDatails";
 import { buildCaseNarrativeFromCaseDetails } from "../utils/arresting_officer_narrative";
 import { convertCaseDetailToAD, createAffidavitOfArrestingOfficerTemplate } from "../utils/affidavit_of_arresting_officer";
+import { usePoliceOfficer } from "../hooks/usePoliceOfficer";
 
 type FastModeTemplateType =
   | "ComplainantAffidavit"
@@ -174,6 +175,7 @@ const ReportCreation: React.FC = () => {
   ]);
 
   const { caseDetails, setCaseDetails } = useCaseDetails();
+  const { policeStation } = usePoliceOfficer();
 
   // -------------------------------------------------------------------------
   // Generate modal state
@@ -210,7 +212,7 @@ const ReportCreation: React.FC = () => {
       const response = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ caseDetails, systemPrompt }),
+        body: JSON.stringify({ caseDetails, policeStation, systemPrompt }),
       }).then((res) => res.json());
 
       const parsed = JSON.parse(response.message.content);
@@ -241,7 +243,7 @@ const ReportCreation: React.FC = () => {
         }`
       );
     }
-  }, [caseDetails, resultEditor, title]);
+  }, [caseDetails, policeStation, resultEditor, title]);
 
   // -------------------------------------------------------------------------
   // Fast mode: insert ready-made template

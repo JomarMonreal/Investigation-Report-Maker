@@ -32,6 +32,11 @@ const dummyDetails = {
 	victim: "Asher Hernandez",
 };
 
+const municipalityProvinceFormatter = (incidentLocation) => {
+	const muni = incidentLocation.cityOrMunicipality;
+	const province = incidentLocation.province;
+	return `${muni}, ${province}`;
+}
 
 const app = express();
 const PORT = 3000;
@@ -67,6 +72,7 @@ app.post('/api/generate', async (req, res) => {
 		}
 
 		const details = req.body.caseDetails ? req.body.caseDetails : dummyDetails;
+		const station = req.body.policeStation ? req.body.policeStation : {name: "Los Banos Police Station", address: "Los Banos, Laguna"};
 
 		console.log(systemPrompt + template);
 		console.log('Generating Report...');
@@ -106,7 +112,7 @@ app.post('/api/generate', async (req, res) => {
 				"type": "paragraph",
 				"children": [
 					{
-						"text": `Lalawigan ng ${details.incidentLocation}`, // WARN: No 'Province' input field
+						"text": `Lalawigan ng ${details.incidentLocation.province}`, // WARN: No 'Province' input field
 						"bold": true
 					}
 				]
@@ -115,7 +121,7 @@ app.post('/api/generate', async (req, res) => {
 				"type": "paragraph",
 				"children": [
 					{
-						"text": `Bayan ng ${details.incidentLocation}` // WARN: No 'City' input field
+						"text": `Bayan ng ${details.incidentLocation.cityOrMunicipality}` // WARN: No 'City' input field
 					}
 				]
 			},
@@ -152,7 +158,7 @@ app.post('/api/generate', async (req, res) => {
 				"align": "justify",
 				"children": [
 					{
-						"text": `AKO, ${details.arrestingOfficers[0]?.fullName.toUpperCase()} ${new Date().getFullYear() - new Date(details.arrestingOfficers[0]?.dateOfBirth).getFullYear()} taong-gulang, kagawad ng Pulisya at nakatalaga sa ${details.arrestingOfficers[0]?.unitOrStation}, naninirahan sa {{ARRESTING_OFFICER_HOME_ADDRESS}}, matapos na makapanumpa alinsunod sa ipinag-uutos ng Saligang Batas ng Plilipinas ay malaya at kusang loob na nagsasalaysay gaya ng mga sumusunod:` // WARN: NOT PRECISE AGE
+						"text": `AKO, ${details.arrestingOfficers[0]?.fullName.toUpperCase()} ${new Date().getFullYear() - new Date(details.arrestingOfficers[0]?.dateOfBirth).getFullYear()} taong-gulang, kagawad ng Pulisya at nakatalaga sa ${details.arrestingOfficers[0]?.unitOrStation}, naninirahan sa ${municipalityProvinceFormatter(details.arrestingOfficers[0]?.address)}, matapos na makapanumpa alinsunod sa ipinag-uutos ng Saligang Batas ng Plilipinas ay malaya at kusang loob na nagsasalaysay gaya ng mga sumusunod:` // WARN: NOT PRECISE AGE
 					}
 				]
 			},
@@ -178,7 +184,7 @@ app.post('/api/generate', async (req, res) => {
 						"bold": true
 					},
 					{
-						"text": ` ay lumagda ako ng aking pangalan at apelyido ngayong ika-${reportDate.getDate()} ng ${reportDate.getMonth()} ${reportDate.getFullYear()} dito sa {{LOCATION}}.`
+						"text": ` ay lumagda ako ng aking pangalan at apelyido ngayong ika-${reportDate.getDate()} ng ${reportDate.getMonth()} ${reportDate.getFullYear()} dito sa ${municipalityProvinceFormatter(details.incidentLocation)}.`
 					}
 				]
 			},
@@ -225,7 +231,7 @@ app.post('/api/generate', async (req, res) => {
 				"align": "justify",
 				"children": [
 					{
-						"text": `SWORN AND SUBSCRIBED TO BEFORE ME this ${reportDate.getDate()} day of ${reportDate.getMonth()} ${reportDate.getFullYear()} at {{LOCATION}} and further certify that I personally examined the affaint and that I am fully satisfied that she voluntarily executed and understood the contents of the foregoing statements.`
+						"text": `SWORN AND SUBSCRIBED TO BEFORE ME this ${reportDate.getDate()} day of ${reportDate.getMonth()} ${reportDate.getFullYear()} at ${municipalityProvinceFormatter(station.address)} and further certify that I personally examined the affaint and that I am fully satisfied that she voluntarily executed and understood the contents of the foregoing statements.`
 					}
 				]
 			},

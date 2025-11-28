@@ -288,29 +288,6 @@ const CaseDetailsForm: React.FC = () => {
               />
             </Stack>
 
-            <Stack className={css.inlineFields} direction="row" spacing={2}>
-              <TextField
-                className={css.field}
-                label="Report Date (YYYY-MM-DD)"
-                value={caseDetails.reportDate}
-                onChange={(event) =>
-                  handleCaseFieldChange('reportDate', event.target.value as IsoDate)
-                }
-                fullWidth
-                size="small"
-              />
-              <TextField
-                className={css.field}
-                label="Report Time (HH:MM)"
-                value={caseDetails.reportTime}
-                onChange={(event) =>
-                  handleCaseFieldChange('reportTime', event.target.value as Time24h)
-                }
-                fullWidth
-                size="small"
-              />
-            </Stack>
-
             <TextField
               className={css.field}
               label="Incident Type"

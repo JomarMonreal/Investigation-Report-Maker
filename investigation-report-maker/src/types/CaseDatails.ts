@@ -410,6 +410,20 @@ export interface PreOperationDetails {
   completionSignalDescription?: string;
 }
 
+export interface PoliceStation {
+  /** Name of the police station or precinct. */
+  name: string;
+
+  /** Complete address of the police station. */
+  address: PhilippineAddress;
+
+  /** Contact number of the police station, if available. */
+  contactNumber?: string;
+
+  /** Email address of the police station, if available. */
+  email?: string;
+}
+
 // ---------------------------------------------------------------------------
 // Core case details – main aggregate root
 // ---------------------------------------------------------------------------
@@ -440,9 +454,13 @@ export interface CaseDetails {
 
   /** Exact place of incident (address, landmarks, description). */
   incidentLocation: PhilippineAddress;
+  
+  /** Police station or precinct handling the case. */
+  policeStation: PoliceStation;
 
   /** Station or unit handling the case (investigating unit). */
   investigatingUnit: string;
+
 
   /** Priority level of the case. */
   priority: CasePriority;

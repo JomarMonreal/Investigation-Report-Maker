@@ -10,11 +10,16 @@ import {
   Stack,
   Tooltip,
   ToggleButton,
-  ToggleButtonGroup
+  ToggleButtonGroup,
+  TextField
 } from "@mui/material";
 import * as React from "react";
 import { EditorToolbar } from "./Editor/EditorToolbar";
 import type { CustomElement } from "../utils/slateHelpers";
+import type { IsoDate, Time24h } from "../types/CaseDatails";
+
+import { useCaseDetails } from "../hooks/useCaseDetails";
+import css from "./CaseDetailsForm.module.css";
 
 export type ReportView = "result" | "details";
 
@@ -52,6 +57,18 @@ const DocScaffoldLoad: React.FC<DocScaffoldLoadProps> = ({
   onViewChange,
   moreOptions // Destructure the new prop
 }) => {
+  const { caseDetails, setCaseDetails } = useCaseDetails();
+
+  const handleCaseFieldChange = <K extends keyof typeof caseDetails>(
+    field: K,
+    value: typeof caseDetails[K],
+  ): void => {
+    setCaseDetails({
+      ...caseDetails,
+      [field]: value,
+    });
+  }
+
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
 
   const [internalView, setInternalView] = React.useState<ReportView>("result");
@@ -204,7 +221,30 @@ const DocScaffoldLoad: React.FC<DocScaffoldLoadProps> = ({
 
         </Stack>
       </Stack>
+      <Stack className={css.inlineFields} direction="row" spacing={2}>
+        <TextField
+          className={css.field}
+          label="Report Date (YYYY-MM-DD)"
+          value={caseDetails.reportDate}
+          onChange={(event) =>
+            handleCaseFieldChange('reportDate', event.target.value as IsoDate)
+          }
+          fullWidth
+          size="small"
+        />
+        <TextField
+          className={css.field}
+          label="Report Time (HH:MM)"
+          value={caseDetails.reportTime}
+          onChange={(event) =>
+            handleCaseFieldChange('reportTime', event.target.value as Time24h)
+          }
+          fullWidth
+          size="small"
+        />
+      </Stack>
 
+        <hr  />
       <EditorToolbar />
 
       <Stack direction="row" spacing={1.5} sx={{ minHeight: 560 }}>
