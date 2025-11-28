@@ -174,7 +174,7 @@ const ReportCreation: React.FC = () => {
     { type: "paragraph", children: [{ text: "Start typing or load a template..." }] }
   ]);
 
-  const { caseDetails, setCaseDetails } = useCaseDetails();
+  const { caseDetails, setCaseDetails, setIsFetching } = useCaseDetails();
   const { policeStation } = usePoliceOfficer();
 
   // -------------------------------------------------------------------------
@@ -206,9 +206,11 @@ const ReportCreation: React.FC = () => {
   // -------------------------------------------------------------------------
   // AI mode: call your /api/generate endpoint
   // -------------------------------------------------------------------------
-
+  
   const handleGenerateReportAIMode = React.useCallback(async () => {
+    setModeDialogOpen(false);
     try {
+      setIsFetching(true);
       const response = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -235,15 +237,16 @@ const ReportCreation: React.FC = () => {
       }
 
       setView("result");
-      setModeDialogOpen(false);
+      setIsFetching(false);
     } catch (err) {
       alert(
         `Failed to generate report: ${
           err instanceof Error ? err.message : "Unknown error"
         }`
       );
+      setIsFetching(false);
     }
-  }, [caseDetails, policeStation, resultEditor, title]);
+  }, [caseDetails, policeStation, resultEditor, title, setIsFetching]);
 
   // -------------------------------------------------------------------------
   // Fast mode: insert ready-made template

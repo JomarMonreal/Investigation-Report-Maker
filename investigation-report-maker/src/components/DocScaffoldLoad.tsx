@@ -11,7 +11,8 @@ import {
   Tooltip,
   ToggleButton,
   ToggleButtonGroup,
-  TextField
+  TextField,
+  CircularProgress
 } from "@mui/material";
 import * as React from "react";
 import { EditorToolbar } from "./Editor/EditorToolbar";
@@ -57,7 +58,7 @@ const DocScaffoldLoad: React.FC<DocScaffoldLoadProps> = ({
   onViewChange,
   moreOptions // Destructure the new prop
 }) => {
-  const { caseDetails, setCaseDetails } = useCaseDetails();
+  const { caseDetails, setCaseDetails, isFetching } = useCaseDetails();
 
   const handleCaseFieldChange = <K extends keyof typeof caseDetails>(
     field: K,
@@ -204,16 +205,20 @@ const DocScaffoldLoad: React.FC<DocScaffoldLoadProps> = ({
                 </Tooltip>
               )}
 
-              <Tooltip title="Generate a report from details">
-                <Button
-                  color="primary"
-                  onClick={onGenerateReport}
-                  startIcon={<DescriptionIcon />}
-                  variant="contained"
-                >
-                  Generate Report
-                </Button>
-              </Tooltip>
+              {
+                isFetching ? <CircularProgress size={24} sx={{ ml: 2 }}/> :               
+                <Tooltip title="Generate a report from details">
+                  <Button
+                    color="primary"
+                    onClick={onGenerateReport}
+                    startIcon={<DescriptionIcon />}
+                    variant="contained"
+                  >
+                    Generate Report
+                  </Button>
+                </Tooltip>
+              }
+
             </>
           )}
 

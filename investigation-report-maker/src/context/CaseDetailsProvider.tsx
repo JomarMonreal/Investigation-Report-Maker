@@ -58,8 +58,10 @@ export const CaseDetailsProvider: React.FC<{ children: React.ReactNode }> = ({ c
     narrative: "",
   });
 
+  const [isFetching, setIsFetching] = useState<boolean>(false);
+
   return (
-    <CaseDetailsContext.Provider value={{ caseDetails, setCaseDetails }}>
+    <CaseDetailsContext.Provider value={{ caseDetails, setCaseDetails, isFetching, setIsFetching }}>
       {children}
     </CaseDetailsContext.Provider>
   );
