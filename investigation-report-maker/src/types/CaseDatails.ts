@@ -55,6 +55,73 @@ export type InventoryType =
   | "PhotographyOnly"
   | "InventoryAndPhotography";
 
+
+  /**
+ * Structured mailing address within the Philippines.
+ */
+export interface PhilippineAddress {
+  /**
+   * Apartment, unit, floor, building name, and house or lot number.
+   * Example: "Unit 3B, Bldg. 5, Lot 12"
+   */
+  buildingOrHouse?: string;
+
+  /**
+   * Street name.
+   * Example: "Lopez Avenue"
+   */
+  street?: string;
+
+  /**
+   * Subdivision, village, or residential complex, if any.
+   * Example: "Marymount Subdivision"
+   */
+  subdivisionOrVillage?: string;
+
+  /**
+   * Sitio or purok, if applicable.
+   * Example: "Purok 2"
+   */
+  sitioOrPurok?: string;
+
+  /**
+   * Barangay name.
+   * Example: "Barangay Batong Malake"
+   */
+  barangay: string;
+
+  /**
+   * City or municipality.
+   * Example: "Los Baños"
+   */
+  cityOrMunicipality: string;
+
+  /**
+   * Province name.
+   * For highly urbanized / independent cities, this may repeat the city
+   * or use the parent province for administrative purposes.
+   * Example: "Laguna"
+   */
+  province: string;
+
+  /**
+   * Region label or code (e.g., "Region IV-A", "CALABARZON", "NCR").
+   */
+  region?: string;
+
+  /**
+   * Four-digit ZIP/postal code.
+   * Example: "4030"
+   */
+  postalCode?: string;
+
+  /**
+   * Country name. For Philippine addresses, always "Philippines".
+   */
+  country: 'Philippines';
+}
+
+
 // ---------------------------------------------------------------------------
 // Shared person and officer types
 // ---------------------------------------------------------------------------
@@ -80,6 +147,9 @@ export interface Person {
 
   /** Complete home or mailing address. */
   address: string;
+
+  /** Structured address components. */
+  completeAddress: PhilippineAddress;
 
   /** Primary contact number, if available. */
   contactNumber?: string;
