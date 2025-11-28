@@ -1,5 +1,5 @@
 const express = require('express');
-const {default: ollama} = require('ollama');
+const {Ollama} = require('ollama');
 const z = require('zod');
 const fs = require('fs');
 
@@ -20,7 +20,7 @@ const CustomElementSchema = z.object({
 
 const CustomElementArraySchema = z.array(CustomElementSchema);
 
-const systemPrompt = "You are an assistant that creates crime narratives based on the given details for an affidafit. Do not fabricate events not mentioned in the details. Use Tagalog. Respond in JSON. After generating the narrative, check each sentence if it is stated in the details provided. If the sentence is not stated in the details provided, it should be underlined by adding an underline attribute to the text object (example: {text: 'this should be underlined', underline: true}). Separate the narrative into different statements of events. Each event will be its own paragraph.";
+const systemPrompt = "You are an assistant that creates crime narratives based on the given details for an affidafit. Do not fabricate events not mentioned in the details. Respond in JSON. After generating the narrative, check each sentence if it is stated in the details provided. If the sentence is not stated in the details provided, it should be underlined by adding an underline attribute to the text object (example: {text: 'this should be underlined', underline: true}). Separate the narrative into different statements of events. Each event will be its own paragraph. Make sure all sentences are in tagalog.";
 
 const dummyDetails = {
 	suspect: "Ronaldo Martin",
@@ -30,13 +30,26 @@ const dummyDetails = {
 	place: "Lopez Ave., Los Banos, Laguna",
 	crime: "attempted homicide",
 	victim: "Asher Hernandez",
-}
+};
 
 
 const app = express();
 const PORT = 3000;
 
 app.use(express.json());
+
+// Create a fetch function with custom timeout
+const fetchWithTimeout = (url, init = {}) => {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 600000) // 10 minutes
+
+  return fetch(url, {
+    ...init,
+    signal: init.signal || controller.signal
+  }).finally(() => clearTimeout(timeoutId))
+};
+
+
 
 app.post('/api/generate', async (req, res) => {
 
@@ -53,12 +66,14 @@ app.post('/api/generate', async (req, res) => {
 			return res.status(500).json({ error: 'Template file not found' });
 		}
 
-		const details = req.body.details ? req.body.details : dummyDetails;
+		const details = req.body.caseDetails ? req.body.caseDetails : dummyDetails;
 
 		console.log(systemPrompt + template);
 		console.log('Generating Report...');
+    console.log(details);
+    const ollama = new Ollama({fetch: fetchWithTimeout});
 		const response = await ollama.chat({
-			model: 'gemma3:12b',
+			model: 'gemma3:4b',
 			messages: [
 				{role: 'system', content: systemPrompt},
 				{role: 'user', content: JSON.stringify(details)},
@@ -67,12 +82,23 @@ app.post('/api/generate', async (req, res) => {
 		});
 
 		const narrative = JSON.parse(response.message.content);
-
 		for (var i = 0; i < narrative.length; i++) {
 			narrative[i].children[0].text = (i + 1).toString() + ". " + narrative[i].children[0].text;
 		}
-
 		narrative.forEach((event) => console.log(event));
+
+    // dummy narrative
+    // const narrative = "NARRATIVE";
+
+
+    console.log("printing events...");
+
+
+    console.log("done printing events...");
+
+
+    reportDate = new Date(details.reportDate);
+    indidentDate = new Date(details.incidentDate);
 
 		// affidavit of poseur buyer specific
 		const header = [
@@ -80,7 +106,7 @@ app.post('/api/generate', async (req, res) => {
 				"type": "paragraph",
 				"children": [
 					{
-						"text": "Lalawigan ng",
+						"text": `Lalawigan ng ${details.incidentLocation}`, // WARN: No 'Province' input field
 						"bold": true
 					}
 				]
@@ -89,7 +115,7 @@ app.post('/api/generate', async (req, res) => {
 				"type": "paragraph",
 				"children": [
 					{
-						"text": "Bayan ng Mansalay"
+						"text": `Bayan ng ${details.incidentLocation}` // WARN: No 'City' input field
 					}
 				]
 			},
@@ -126,7 +152,7 @@ app.post('/api/generate', async (req, res) => {
 				"align": "justify",
 				"children": [
 					{
-						"text": "AKO, {{ARRESTING_OFFICER_NAME}} {{ARRESTING_OFFICER_AGE}} taong-gulang, kagawad ng Pulisya at nakatalaga sa {{ARRESTING_OFFICER_STATION}}, naninirahan sa {{ARRESTING_OFFICER_HOME_ADDRESS}}, matapos na makapanumpa alinsunod sa ipinag-uutos ng Saligang Batas ng Plilipinas ay malaya at kusang loob na nagsasalaysay gaya ng mga sumusunod:"
+						"text": `AKO, ${details.arrestingOfficers[0]?.fullName.toUpperCase()} ${new Date().getFullYear() - new Date(details.arrestingOfficers[0]?.dateOfBirth).getFullYear()} taong-gulang, kagawad ng Pulisya at nakatalaga sa ${details.arrestingOfficers[0]?.unitOrStation}, naninirahan sa {{ARRESTING_OFFICER_HOME_ADDRESS}}, matapos na makapanumpa alinsunod sa ipinag-uutos ng Saligang Batas ng Plilipinas ay malaya at kusang loob na nagsasalaysay gaya ng mga sumusunod:` // WARN: NOT PRECISE AGE
 					}
 				]
 			},
@@ -152,7 +178,7 @@ app.post('/api/generate', async (req, res) => {
 						"bold": true
 					},
 					{
-						"text": " ay lumagda ako ng aking pangalan at apelyido ngayong ika-{{DAY}} ng {{MONTH}} {{YEAR}} dito sa {{LOCATION}}."
+						"text": ` ay lumagda ako ng aking pangalan at apelyido ngayong ika-${reportDate.getDate()} ng ${reportDate.getMonth()} ${reportDate.getFullYear()} dito sa {{LOCATION}}.`
 					}
 				]
 			},
@@ -170,7 +196,7 @@ app.post('/api/generate', async (req, res) => {
 				"align": "right",
 				"children": [
 					{
-						"text": "{{ARRESTING_OFFICER_NAME}}"
+						"text": `${details.arrestingOfficers[0]?.fullName}` // WARN: hard coded to take the first arresting officer.
 					}
 				]
 			},
@@ -199,7 +225,7 @@ app.post('/api/generate', async (req, res) => {
 				"align": "justify",
 				"children": [
 					{
-						"text": "SWORN AND SUBSCRIBED TO BEFORE ME this {{DAY}} day of {{MONTH}} {{YEAR}} at {{LOCATION}} and further certify that I personally examined the affaint and that I am fully satisfied that she voluntarily executed and understood the contents of the foregoing statements."
+						"text": `SWORN AND SUBSCRIBED TO BEFORE ME this ${reportDate.getDate()} day of ${reportDate.getMonth()} ${reportDate.getFullYear()} at {{LOCATION}} and further certify that I personally examined the affaint and that I am fully satisfied that she voluntarily executed and understood the contents of the foregoing statements.`
 					}
 				]
 			},
@@ -217,7 +243,7 @@ app.post('/api/generate', async (req, res) => {
 				"align": "right",
 				"children": [
 					{
-						"text": "{{ADMINISTERING_OFFICER_NAME}}"
+						"text": `${details.assignedOfficer.fullName}`
 					}
 				]
 			},
@@ -231,6 +257,11 @@ app.post('/api/generate', async (req, res) => {
 				]
 			}
 		];
+
+    // let response = {message: {content: {}}};
+    // response.message.content = JSON.stringify(header.concat(narrative, footer));
+
+    console.log(response);
 
 		response.message.content = JSON.stringify(header.concat(narrative, footer));
 		// end of affidavit of poseur buyer specific

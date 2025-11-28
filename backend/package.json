@@ -14,5 +14,8 @@
     "express": "^5.1.0",
     "ollama": "^0.6.3",
     "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.11"
   }
 }
