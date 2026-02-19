@@ -16,162 +16,27 @@ import {
   Button,
   Typography,
   Box,
-  Stack,
 } from "@mui/material";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
-import CaseDetailsForm from '../components/CaseDetailsForm';
+import CaseDetailsForm from "../components/CaseDetailsForm";
 import { useCaseDetails } from "../hooks/useCaseDetails";
-import type { CaseDetails, Officer } from "../types/CaseDatails";
-import { buildCaseNarrativeFromCaseDetails } from "../utils/arresting_officer_narrative";
-import { convertCaseDetailToAD, createAffidavitOfArrestingOfficerTemplate } from "../utils/affidavit_of_arresting_officer";
 import { usePoliceOfficer } from "../hooks/usePoliceOfficer";
 
-type FastModeTemplateType =
-  | "ComplainantAffidavit"
-  | "ArrestingOfficerAffidavit"
-  | "WitnessAffidavit"
-  | "PoseurBuyerAffidavit";
-
-  /**
- * Builds a simple Slate document (Descendant[]) for the selected fast-mode template.
- *
- * Note:
- * - Uses {{prop.path}} placeholders that are intended to map to your CaseDetails-style data.
- * - You can adjust the property paths to match your final data model.
- */
-function buildFastModeTemplate(docType: FastModeTemplateType, officer: Officer, caseDetails: CaseDetails): CustomElement[] {
-  switch (docType) {
-    case "ComplainantAffidavit":
-      return [
-        {
-          type: "paragraph",
-          children: [
-            {
-              text:
-                "AKO, {{complainant.fullName}}, " +
-                "{{complainant.age}} taong-gulang, " +
-                "na may tirahan sa {{complainant.address}}, " +
-                "ay malaya at kusang-loob na nagsasalaysay at nagpapahayag sa ilalim ng panunumpa gaya ng mga sumusunod:",
-            },
-          ],
-        },
-        {
-          type: "paragraph",
-          children: [
-            {
-              text:
-                "Na ako ang nagrereklamo sa kasong may bilang {{caseNumber}} na may pamagat na “{{caseTitle}}”, " +
-                "na naganap noong {{incidentDate}} bandang {{incidentTime}} sa {{incidentLocation}}, " +
-                "na iniuuri bilang {{incidentType}}.",
-            },
-          ],
-        },
-        {
-          type: "paragraph",
-          children: [
-            {
-              text:
-                "Na ang kabuuang salaysay ng pangyayari ay ang mga sumusunod:\n\n{{incidentSummary}}\n\n{{narrative}}",
-            },
-          ],
-        },
-      ];
-
-    case "ArrestingOfficerAffidavit":
-      
-      return createAffidavitOfArrestingOfficerTemplate(buildCaseNarrativeFromCaseDetails(caseDetails), convertCaseDetailToAD(caseDetails));
-
-    case "WitnessAffidavit":
-      return [
-        {
-          type: "paragraph",
-          children: [
-            {
-              text:
-                "AKO, {{witnesses[0].fullName}}, {{witnesses[0].age}} taong-gulang, " +
-                "na naninirahan sa {{witnesses[0].address}}, " +
-                "ay malaya at kusang-loob na nagsasalaysay sa ilalim ng panunumpa, gaya ng mga sumusunod:",
-            },
-          ],
-        },
-        {
-          type: "paragraph",
-          children: [
-            {
-              text:
-                "Na noong {{incidentDate}} bandang {{incidentTime}}, ako ay nasa {{witnesses[0].locationDuringIncident}} " +
-                "kung saan personal kong {{witnesses[0].observationNarrative}} " +
-                "kaugnay ng insidenteng may pamagat na “{{caseTitle}}” na naganap sa {{incidentLocation}}.",
-            },
-          ],
-        },
-        {
-          type: "paragraph",
-          children: [
-            {
-              text:
-                "Na ang aking obserbasyon ay naaapektuhan ng mga sumusunod na kondisyon:\n\n" +
-                "{{witnesses[0].observationConditions}}",
-            },
-          ],
-        },
-      ];
-
-    case "PoseurBuyerAffidavit":
-      return [
-        {
-          type: "paragraph",
-          children: [
-            {
-              text:
-                "AKO, {{poseurBuyer.fullName}}, isang pulis na may ranggong " +
-                "{{poseurBuyer.rankOrPosition}} na nakatalaga sa {{poseurBuyer.unitOrStation}}, " +
-                "na kumilos bilang poseur buyer sa buy-bust operation laban kay/kina {{suspects[0].fullName}}, " +
-                "ay malaya at kusang-loob na nagsasalaysay sa ilalim ng panunumpa gaya ng mga sumusunod:",
-            },
-          ],
-        },
-        {
-          type: "paragraph",
-          children: [
-            {
-              text:
-                "Na bago ang operasyon ay nagkaroon ng pre-operation briefing noong {{preOperationDetails.briefingDate}} " +
-                "bandang {{preOperationDetails.briefingTime}} batay sa Pre-Operation Report na may bilang " +
-                "{{preOperationDetails.preOperationReportNumber}}.",
-            },
-          ],
-        },
-        {
-          type: "paragraph",
-          children: [
-            {
-              text:
-                "Na sa mismong operasyon, ang kabuuang salaysay ng aking naging papel bilang poseur buyer ay ang mga sumusunod:\n\n" +
-                "{{poseurBuyer.poseurBuyerNarrative}}\n\n{{preOperationDetails.saleOrDeliveryNarrative}}",
-            },
-          ],
-        },
-      ];
-
-    default:
-      return [
-        {
-          type: "paragraph",
-          children: [{ text: "Template not found." }],
-        },
-      ];
-  }
-}
+// ✅ Add these imports
+import { MessagingProvider } from "../context/MessagingProvider";
+import { VirtualFiscalDrawer } from "../components/VirtualFiscalDrawer";
 
 const ReportCreation: React.FC = () => {
   const [title, setTitle] = React.useState<string>("Untitled Report");
   const [view, setView] = React.useState<ReportView>("details");
 
+  // ✅ Drawer state
+  const [fiscalOpen, setFiscalOpen] = React.useState<boolean>(false);
+
   // Slate
   const [resultEditor] = React.useState(() => withReact(createEditor()));
   const [resultValue, setResultValue] = React.useState<CustomElement[]>([
-    { type: "paragraph", children: [{ text: "Start typing or load a template..." }] }
+    { type: "paragraph", children: [{ text: "Start typing or load a template..." }] },
   ]);
 
   const { caseDetails, setCaseDetails, setIsFetching } = useCaseDetails();
@@ -180,7 +45,6 @@ const ReportCreation: React.FC = () => {
   // -------------------------------------------------------------------------
   // Generate modal state
   // -------------------------------------------------------------------------
-
   const [modeDialogOpen, setModeDialogOpen] = React.useState<boolean>(false);
 
   const handleOpenGenerateDialog = React.useCallback(() => {
@@ -194,7 +58,6 @@ const ReportCreation: React.FC = () => {
   // -------------------------------------------------------------------------
   // Template management (stubbed for now)
   // -------------------------------------------------------------------------
-
   const handleLoadTemplate = React.useCallback(() => {
     // store only
   }, []);
@@ -206,7 +69,6 @@ const ReportCreation: React.FC = () => {
   // -------------------------------------------------------------------------
   // AI mode: call your /api/generate endpoint
   // -------------------------------------------------------------------------
-  
   const handleGenerateReportAIMode = React.useCallback(async () => {
     setModeDialogOpen(false);
     try {
@@ -218,8 +80,6 @@ const ReportCreation: React.FC = () => {
       }).then((res) => res.json());
 
       const parsed = JSON.parse(response.message.content);
-
-      // const nodes = policeReportSummary as unknown as Descendant[];
       const nodes = parsed as Descendant[];
 
       Editor.withoutNormalizing(resultEditor, () => {
@@ -239,47 +99,14 @@ const ReportCreation: React.FC = () => {
       setView("result");
       setIsFetching(false);
     } catch (err) {
-      alert(
-        `Failed to generate report: ${
-          err instanceof Error ? err.message : "Unknown error"
-        }`
-      );
+      alert(`Failed to generate report: ${err instanceof Error ? err.message : "Unknown error"}`);
       setIsFetching(false);
     }
   }, [caseDetails, policeStation, resultEditor, title, setIsFetching]);
 
   // -------------------------------------------------------------------------
-  // Fast mode: insert ready-made template
-  // -------------------------------------------------------------------------
-
-  const handleFastModeGenerate = React.useCallback(
-    (templateType: FastModeTemplateType) => {
-      const nodes = buildFastModeTemplate(templateType, caseDetails.assignedOfficer, caseDetails);
-
-      Editor.withoutNormalizing(resultEditor, () => {
-        Transforms.select(resultEditor, {
-          anchor: Editor.start(resultEditor, []),
-          focus: Editor.end(resultEditor, []),
-        });
-        Transforms.delete(resultEditor);
-        Transforms.insertNodes(resultEditor, nodes, { at: [0] });
-        Transforms.select(resultEditor, Editor.start(resultEditor, []));
-      });
-
-      if (caseDetails.caseTitle && (!title || title === "Untitled Report")) {
-        setTitle(caseDetails.caseTitle);
-      }
-
-      setView("result");
-      setModeDialogOpen(false);
-    },
-    [caseDetails, resultEditor, title]
-  );
-
-  // -------------------------------------------------------------------------
   // Template load error
   // -------------------------------------------------------------------------
-
   const handleLoadError = React.useCallback((message: string) => {
     alert(`Template import failed: ${message}`);
   }, []);
@@ -287,7 +114,6 @@ const ReportCreation: React.FC = () => {
   // -------------------------------------------------------------------------
   // Menu (save/load details)
   // -------------------------------------------------------------------------
-
   const [menuAnchor, setMenuAnchor] = React.useState<null | HTMLElement>(null);
 
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
@@ -336,131 +162,85 @@ const ReportCreation: React.FC = () => {
   };
 
   return (
-    <>
-      {/* Generate mode selection dialog */}
-      <Dialog
-        open={modeDialogOpen}
-        onClose={handleCloseGenerateDialog}
-        fullWidth
-        maxWidth="sm"
-      >
-        <DialogTitle>Generate Report</DialogTitle>
-        <DialogContent dividers>
-          {/* AI mode section */}
-          <Box mb={3}>
-            <Typography variant="subtitle1" gutterBottom>
-              AI Mode
-            </Typography>
-            <Typography variant="body2" paragraph>
-              Gumamit ng AI upang awtomatikong buuin ang buong ulat mula sa mga
-              detalye ng kaso.
-            </Typography>
-            <Button
-              variant="contained"
-              fullWidth
-              onClick={handleGenerateReportAIMode}
-            >
-              Use AI Mode
-            </Button>
-          </Box>
+    <MessagingProvider>
+      <>
+        {/* ✅ Virtual Fiscal Drawer */}
+        <VirtualFiscalDrawer open={fiscalOpen} onClose={() => setFiscalOpen(false)} />
 
-          {/* Fast mode section */}
-          <Box>
-            <Typography variant="subtitle1" gutterBottom>
-              Fast Mode
-            </Typography>
-            <Typography variant="body2" paragraph>
-              {`Pumili ng mabilis na template para agad makabuo ng affidavit na may {{prop}} placeholders na maaari mong punan o i-auto-fill.`}
-            </Typography>
-            <Stack spacing={1}>
-              <Button
-                variant="outlined"
-                onClick={() =>
-                  handleFastModeGenerate("ComplainantAffidavit")
-                }
-              >
-                Affidavit of Complainant
+        {/* Generate mode selection dialog */}
+        <Dialog open={modeDialogOpen} onClose={handleCloseGenerateDialog} fullWidth maxWidth="sm">
+          <DialogTitle>Generate Report</DialogTitle>
+          <DialogContent dividers>
+            <Box mb={3}>
+              <Typography variant="subtitle1" gutterBottom>
+                AI Mode
+              </Typography>
+              <Typography variant="body2" paragraph>
+                Gumamit ng AI upang awtomatikong buuin ang buong ulat mula sa mga detalye ng kaso.
+              </Typography>
+              <Button variant="contained" fullWidth onClick={handleGenerateReportAIMode}>
+                Use AI Mode
               </Button>
-              <Button
-                variant="outlined"
-                onClick={() =>
-                  handleFastModeGenerate("ArrestingOfficerAffidavit")
-                }
-              >
-                Affidavit of Arresting Officer
-              </Button>
-              <Button
-                variant="outlined"
-                onClick={() => handleFastModeGenerate("WitnessAffidavit")}
-              >
-                Affidavit of Witness
-              </Button>
-              <Button
-                variant="outlined"
-                onClick={() =>
-                  handleFastModeGenerate("PoseurBuyerAffidavit")
-                }
-              >
-                Affidavit of Poseur Buyer
-              </Button>
-            </Stack>
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseGenerateDialog}>Close</Button>
-        </DialogActions>
-      </Dialog>
+            </Box>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCloseGenerateDialog}>Close</Button>
+          </DialogActions>
+        </Dialog>
 
-      {/* Main layout */}
-      <Slate
-        editor={resultEditor}
-        initialValue={resultValue}
-        onChange={(value) => setResultValue(value as CustomElement[])}
-      >
-        <DocScaffoldLoad
-          title={title}
-          view={view}
-          onViewChange={setView}
-          onTitleChange={setTitle}
-          onLoadTemplate={handleLoadTemplate}
-          onClearPickedTemplate={handleClearTemplateCache}
-          onLoadError={handleLoadError}
-          // Important: open the mode dialog instead of generating immediately
-          onGenerateReport={handleOpenGenerateDialog}
-          resultContent={<EditorComponent editor={resultEditor} />}
-          detailsContent={
-            <CaseDetailsForm />
-          }
-          moreOptions={
-            <>
-              <input
-                type="file"
-                accept="application/json"
-                style={{ display: "none" }}
-                id="load-case-details"
-                onChange={handleLoadCaseDetails}
-              />
+        {/* Main layout */}
+        <Slate
+          editor={resultEditor}
+          initialValue={resultValue}
+          onChange={(value) => setResultValue(value as CustomElement[])}
+        >
+          <DocScaffoldLoad
+            title={title}
+            view={view}
+            onViewChange={setView}
+            onTitleChange={setTitle}
+            onLoadTemplate={handleLoadTemplate}
+            onClearPickedTemplate={handleClearTemplateCache}
+            onLoadError={handleLoadError}
+            onGenerateReport={handleOpenGenerateDialog}
+            resultContent={<EditorComponent editor={resultEditor} />}
+            detailsContent={<CaseDetailsForm />}
+            moreOptions={
+              <>
+                <input
+                  type="file"
+                  accept="application/json"
+                  style={{ display: "none" }}
+                  id="load-case-details"
+                  onChange={handleLoadCaseDetails}
+                />
 
-              <IconButton onClick={handleMenuOpen} aria-label="more options">
-                <MoreVertIcon />
-              </IconButton>
-              <Menu
-                anchorEl={menuAnchor}
-                open={Boolean(menuAnchor)}
-                onClose={handleMenuClose}
-              >
-                <MenuItem onClick={handleSaveCaseDetails}>
-                  Save Case Report Detail
-                </MenuItem>
-                <label htmlFor="load-case-details">
-                  <MenuItem component="span">Load Case Report Detail</MenuItem>
-                </label>
-              </Menu>
-            </>
-          }
-        />
-      </Slate>
-    </>
+                {/* ✅ Open Virtual Fiscal */}
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => setFiscalOpen(true)}
+                  sx={{ mr: 1 }}
+                >
+                  Virtual Fiscal
+                </Button>
+
+                <IconButton onClick={handleMenuOpen} aria-label="more options">
+                  <MoreVertIcon />
+                </IconButton>
+
+                <Menu anchorEl={menuAnchor} open={Boolean(menuAnchor)} onClose={handleMenuClose}>
+                  <MenuItem onClick={handleSaveCaseDetails}>Save Case Report Detail</MenuItem>
+                  <label htmlFor="load-case-details">
+                    <MenuItem component="span">Load Case Report Detail</MenuItem>
+                  </label>
+                </Menu>
+              </>
+            }
+          />
+        </Slate>
+      </>
+    </MessagingProvider>
   );
 };
 
