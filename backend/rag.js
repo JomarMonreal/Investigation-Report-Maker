@@ -5,7 +5,7 @@ const pdfParse = require("pdf-parse");
 const { Document } = require("@langchain/core/documents");
 const { RecursiveCharacterTextSplitter } = require("@langchain/textsplitters");
 
-const { OllamaEmbeddings } = require("@langchain/community/embeddings/ollama");
+const { OllamaEmbeddings } = require("@langchain/ollama");
 const { MemoryVectorStore } = require("@langchain/core/vectorstores");
 
 const DATA_DIR = path.join(process.cwd(), "data");
