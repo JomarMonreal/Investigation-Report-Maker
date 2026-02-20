@@ -39,7 +39,7 @@ const ReportCreation: React.FC = () => {
     { type: "paragraph", children: [{ text: "Start typing or load a template..." }] },
   ]);
 
-  const { caseDetails, setCaseDetails, setIsFetching } = useCaseDetails();
+  const { caseDetails, setCaseDetails, setIsFetching, setSlateValue } = useCaseDetails();
   const { policeStation } = usePoliceOfficer();
 
   // -------------------------------------------------------------------------
@@ -97,12 +97,13 @@ const ReportCreation: React.FC = () => {
       }
 
       setView("result");
+      setSlateValue(resultValue);
       setIsFetching(false);
     } catch (err) {
       alert(`Failed to generate report: ${err instanceof Error ? err.message : "Unknown error"}`);
       setIsFetching(false);
     }
-  }, [caseDetails, policeStation, resultEditor, title, setIsFetching]);
+  }, [setIsFetching, caseDetails, policeStation, resultEditor, title, setSlateValue, resultValue]);
 
   // -------------------------------------------------------------------------
   // Template load error
@@ -162,7 +163,7 @@ const ReportCreation: React.FC = () => {
   };
 
   return (
-    <MessagingProvider>
+    <MessagingProvider >
       <>
         {/* ✅ Virtual Fiscal Drawer */}
         <VirtualFiscalDrawer open={fiscalOpen} onClose={() => setFiscalOpen(false)} />

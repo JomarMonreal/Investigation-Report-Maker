@@ -2,6 +2,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MessagingContext } from "./MessagingContext";
 import type { Message } from "../types/Messages";
+import { useCaseDetails } from "../hooks/useCaseDetails";
+import type { CaseDetailsSlateValue } from "./CaseDetailsContext";
 
 const STORAGE_KEY = "virtual_fiscal_messages";
 
@@ -23,11 +25,11 @@ type AskResponseErr = {
   details?: unknown;
 };
 
-async function askFiscal(question: string, signal?: AbortSignal): Promise<string> {
+async function askFiscal(question: string, slateValue: CaseDetailsSlateValue, signal?: AbortSignal): Promise<string> {
   const res = await fetch("/api/ask", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ question }),
+    body: JSON.stringify({ question, slateValue }),
     signal,
   });
 
@@ -51,6 +53,7 @@ async function askFiscal(question: string, signal?: AbortSignal): Promise<string
 export const MessagingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const isHydratedRef = useRef(false);
+  const  {slateValue} = useCaseDetails(); // for now we just want to trigger re-render on case details change so messages are cleared, but could be used for more advanced features later
 
   // Track latest in-flight request so old responses don’t overwrite newer ones
   const lastRequestIdRef = useRef(0);
@@ -99,7 +102,7 @@ export const MessagingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         // Optional “thinking” placeholder
         send_fiscal_message("…");
 
-        const answer = await askFiscal(cleaned, controller.signal);
+        const answer = await askFiscal(cleaned, slateValue, controller.signal);
 
         // If a newer request happened, ignore this result
         if (requestId !== lastRequestIdRef.current) return;
@@ -137,7 +140,7 @@ export const MessagingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         });
       }
     },
-    [send_fiscal_message]
+    [send_fiscal_message, slateValue]
   );
 
   const clear_messages = useCallback(() => {

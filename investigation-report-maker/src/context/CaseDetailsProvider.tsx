@@ -1,8 +1,13 @@
 import React, { useState } from "react";
-import CaseDetailsContext  from "./CaseDetailsContext";
+import CaseDetailsContext, { type CaseDetailsContextProps }  from "./CaseDetailsContext";
 import type { CaseDetails, IsoDate, Time24h } from "../types/CaseDatails";
 
 export const CaseDetailsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [slateValue, setSlateValue] = useState<CaseDetailsContextProps["slateValue"]>([
+    {
+      children: [{ text: "" }],
+    },
+  ]);
   const [caseDetails, setCaseDetails] = useState<CaseDetails>({
     caseNumber: "",
     caseTitle: "",
@@ -61,7 +66,7 @@ export const CaseDetailsProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const [isFetching, setIsFetching] = useState<boolean>(false);
 
   return (
-    <CaseDetailsContext.Provider value={{ caseDetails, setCaseDetails, isFetching, setIsFetching }}>
+    <CaseDetailsContext.Provider value={{ caseDetails, setCaseDetails, isFetching, setIsFetching, slateValue, setSlateValue }}>
       {children}
     </CaseDetailsContext.Provider>
   );

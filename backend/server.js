@@ -370,29 +370,61 @@ const AskSchema = z.object({
   question: z.string().min(1, "question is required"),
 });
 
+function buildGovFiscalSystemPrompt() {
+  return [
+    "You are a government fiscal officer.",
+    "Use ONLY the provided context (authorized report slate + retrieved context).",
+    'If the context does not contain the answer, say: "I don\'t know based on the provided context."',
+    "Write formally and neutrally.",
+    "Prefer short, numbered points.",
+    "Do not guess or infer missing figures, dates, policies, or approvals.",
+    "If you cite numbers, repeat them exactly and include units and fiscal year if present.",
+  ].join(" ");
+}
+
 app.post("/api/ask", async (req, res) => {
   try {
     const parsed = AskSchema.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ error: "Invalid request body", details: parsed.error.flatten() });
+      return res.status(400).json({
+        error: "Invalid request body",
+        details: parsed.error.flatten(),
+      });
     }
 
-    const { question } = parsed.data;
+    const { question, slateValue } = parsed.data;
 
-    const { context } = await retrieveContext(question, 5);
+    // Slate -> text (authorized report content)
+    const slateContext = slateToPlainText(slateValue);
+
+    // RAG context
+    const { context: retrievedContext } = await retrieveContext(question, 5);
+
+    const combinedContext = [
+      "=== REPORT SLATE (AUTHORIZED VIEW) ===",
+      slateContext || "(No report slate text.)",
+      "",
+      "=== RETRIEVED CONTEXT ===",
+      retrievedContext || "(No retrieved context.)",
+    ].join("\n");
 
     const ollama = new Ollama({ fetch: fetchWithTimeout });
     const response = await ollama.chat({
       model: "gemma3:latest",
       messages: [
-        { role: "system", content: "Answer using ONLY the provided context. If missing, say you don't know." },
-        { role: "user", content: `CONTEXT:\n${context}\n\nQUESTION:\n${question}` },
+        { role: "system", content: buildGovFiscalSystemPrompt() },
+        { role: "user", content: `CONTEXT:\n${combinedContext}\n\nQUESTION:\n${question}` },
       ],
     });
 
-    return res.status(200).json({ answer: (response?.message?.content ?? "").trim() });
+    return res.status(200).json({
+      answer: String(response?.message?.content ?? "").trim(),
+    });
   } catch (e) {
-    return res.status(500).json({ error: "Ask failed", message: e?.message ?? String(e) });
+    return res.status(500).json({
+      error: "Ask failed",
+      message: e?.message ?? String(e),
+    });
   }
 });
 
