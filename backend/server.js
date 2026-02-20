@@ -149,8 +149,7 @@ app.post('/api/generate', async (req, res) => {
     console.log("done printing events...");
 
 
-    reportDate = new Date(details.reportDate);
-    indidentDate = new Date(details.incidentDate);
+
 
 	const station = req.body.policeStation
 	? req.body.policeStation
@@ -159,6 +158,9 @@ app.post('/api/generate', async (req, res) => {
 	// Parse dates safely
 	const reportDate = safeDate(details?.reportDate);
 	const incidentDate = safeDate(details?.incidentDate);
+	
+	reportDate = new Date(details.reportDate);
+    incidentDate = new Date(details.incidentDate);
 
 	// Poseur Buyer safe fields
 	const poseurName = safeUpper(details?.poseurBuyer?.fullName, "[MISSING NAME]");
