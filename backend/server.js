@@ -156,8 +156,8 @@ app.post('/api/generate', async (req, res) => {
 	: { name: "Los Banos Police Station", address: { cityOrMunicipality: "Los Banos", province: "Laguna" } };
 
 	// Parse dates safely
-	const reportDate = safeDate(details?.reportDate);
-	const incidentDate = safeDate(details?.incidentDate);
+	let reportDate = safeDate(details?.reportDate);
+	let incidentDate = safeDate(details?.incidentDate);
 	
 	reportDate = new Date(details.reportDate);
     incidentDate = new Date(details.incidentDate);
