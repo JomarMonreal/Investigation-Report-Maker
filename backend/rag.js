@@ -1,6 +1,7 @@
 const fs = require("fs");
 const path = require("path");
-const pdfParse = require("pdf-parse");
+const pdfParseModule = require("pdf-parse");
+const pdfParse = pdfParseModule.default ?? pdfParseModule;
 
 const { Document } = require("@langchain/core/documents");
 const { RecursiveCharacterTextSplitter } = require("@langchain/textsplitters");
@@ -16,6 +17,7 @@ const embeddings = new OllamaEmbeddings({
 });
 
 let storePromise = null;
+
 
 async function loadPdfText(filePath) {
   const buf = fs.readFileSync(filePath);
