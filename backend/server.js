@@ -368,7 +368,40 @@ app.post('/api/generate', async (req, res) => {
 
 const AskSchema = z.object({
   question: z.string().min(1, "question is required"),
+  slateValue: z.array(z.any()).optional(), // React-Slate Descendant[]
 });
+
+function slateToPlainText(nodes) {
+  if (!Array.isArray(nodes)) return "";
+
+  const parts = [];
+
+  const walk = (node) => {
+    if (!node || typeof node !== "object") return;
+
+    // text leaf
+    if (typeof node.text === "string") {
+      parts.push(node.text);
+      return;
+    }
+
+    // element with children
+    if (Array.isArray(node.children)) {
+      for (const child of node.children) walk(child);
+      parts.push("\n"); // block-ish separator
+    }
+  };
+
+  for (const n of nodes) walk(n);
+
+  return parts
+    .join("")
+    .replace(/\n{3,}/g, "\n\n")
+    .split("\n")
+    .map((l) => l.trimEnd())
+    .join("\n")
+    .trim();
+}
 
 function buildGovFiscalSystemPrompt() {
   return [
