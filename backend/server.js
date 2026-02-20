@@ -33,10 +33,11 @@ const dummyDetails = {
 };
 
 const municipalityProvinceFormatter = (incidentLocation) => {
-	const muni = incidentLocation.cityOrMunicipality;
-	const province = incidentLocation.province;
-	return `${muni}, ${province}`;
-}
+  const muni = incidentLocation?.cityOrMunicipality;
+  const province = incidentLocation?.province;
+  return `${safe(muni, "[MISSING MUNICIPALITY]")}, ${safe(province, "[MISSING PROVINCE]")}`;
+};
+
 
 const app = express();
 const PORT = 3000;
@@ -53,6 +54,23 @@ const fetchWithTimeout = (url, init = {}) => {
     signal: init.signal || controller.signal
   }).finally(() => clearTimeout(timeoutId))
 };
+
+const safe = (v, placeholder = "[MISSING]") => {
+  if (v === null || v === undefined) return placeholder;
+  if (typeof v === "string" && v.trim() === "") return placeholder;
+  return String(v);
+};
+
+const safeUpper = (v, placeholder = "[MISSING]") => safe(v, placeholder).toUpperCase();
+
+const safeDate = (v) => {
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? null : d;
+};
+
+// Month name (Tagalog-friendly output later if you want)
+const monthName = (d) =>
+  d ? d.toLocaleString("en-US", { month: "long" }) : "[MISSING MONTH]";
 
 
 
@@ -71,12 +89,11 @@ app.post('/api/generate', async (req, res) => {
 			return res.status(500).json({ error: 'Template file not found' });
 		}
 
-		const details = req.body.caseDetails ? req.body.caseDetails : dummyDetails;
-		const station = req.body.policeStation ? req.body.policeStation : {name: "Los Banos Police Station", address: "Los Banos, Laguna"};
 
-		console.log(systemPrompt + template);
-		console.log('Generating Report...');
+	console.log(systemPrompt + template);
+	console.log('Generating Report...');
     console.log(details);
+
     const ollama = new Ollama({fetch: fetchWithTimeout});
 	// Build a retrieval query from your case details (tune this!)
 	const ragQuery = [
@@ -135,24 +152,46 @@ app.post('/api/generate', async (req, res) => {
     reportDate = new Date(details.reportDate);
     indidentDate = new Date(details.incidentDate);
 
+	const details = req.body.caseDetails ? req.body.caseDetails : dummyDetails;
+	const station = req.body.policeStation
+	? req.body.policeStation
+	: { name: "Los Banos Police Station", address: { cityOrMunicipality: "Los Banos", province: "Laguna" } };
+
+	// Parse dates safely
+	const reportDate = safeDate(details?.reportDate);
+	const incidentDate = safeDate(details?.incidentDate);
+
+	// Poseur Buyer safe fields
+	const poseurName = safeUpper(details?.poseurBuyer?.fullName, "[MISSING NAME]");
+	const poseurDob = safeDate(details?.poseurBuyer?.dateOfBirth);
+	const poseurAge = poseurDob ? new Date().getFullYear() - poseurDob.getFullYear() : "[MISSING AGE]";
+	const poseurUnit = safe(details?.poseurBuyer?.unitOrStation, "[MISSING UNIT/STATION]");
+	const poseurAddr = municipalityProvinceFormatter(details?.poseurBuyer?.address);
+
+	// Incident location safe fields
+	const incProvince = safe(details?.incidentLocation?.province, "[MISSING PROVINCE]");
+	const incMuni = safe(details?.incidentLocation?.cityOrMunicipality, "[MISSING MUNICIPALITY]");
+	const incPlace = municipalityProvinceFormatter(details?.incidentLocation);
+
+	// Station address could be a string or an object—support both
+	const stationAddr =
+	typeof station?.address === "string"
+		? station.address
+		: municipalityProvinceFormatter(station?.address);
+
+	// Assigned officer safe
+	const assignedOfficerName = safe(details?.assignedOfficer?.fullName, "[MISSING OFFICER NAME]");
+
+
 		// affidavit of poseur buyer specific
 		const header = [
 			{
-				"type": "paragraph",
-				"children": [
-					{
-						"text": `Lalawigan ng ${details.incidentLocation.province}`, // WARN: No 'Province' input field
-						"bold": true
-					}
-				]
+				type: "paragraph",
+				children: [{ text: `Lalawigan ng ${incProvince}`, bold: true }],
 			},
 			{
-				"type": "paragraph",
-				"children": [
-					{
-						"text": `Bayan ng ${details.incidentLocation.cityOrMunicipality}` // WARN: No 'City' input field
-					}
-				]
+				type: "paragraph",
+				children: [{ text: `Bayan ng ${incMuni}` }],
 			},
 			{
 				"type": "paragraph",
@@ -183,13 +222,18 @@ app.post('/api/generate', async (req, res) => {
 				]
 			},
 			{
-				"type": "paragraph",
-				"align": "justify",
-				"children": [
-					{
-						"text": `AKO, ${details.poseurBuyer?.fullName.toUpperCase()} ${new Date().getFullYear() - new Date(details.poseurBuyer?.dateOfBirth).getFullYear()} taong-gulang, kagawad ng Pulisya at nakatalaga sa ${details.poseurBuyer?.unitOrStation}, naninirahan sa ${municipalityProvinceFormatter(details.poseurBuyer?.address)}, matapos na makapanumpa alinsunod sa ipinag-uutos ng Saligang Batas ng Plilipinas ay malaya at kusang loob na nagsasalaysay gaya ng mga sumusunod:` // WARN: NOT PRECISE AGE
-					}
-				]
+				type: "paragraph",
+				align: "justify",
+				children: [
+				{
+					text:
+					`AKO, ${poseurName} ${poseurAge} taong-gulang, ` +
+					`kagawad ng Pulisya at nakatalaga sa ${poseurUnit}, ` +
+					`naninirahan sa ${poseurAddr}, matapos na makapanumpa ` +
+					`alinsunod sa ipinag-uutos ng Saligang Batas ng Pilipinas ay ` +
+					`malaya at kusang loob na nagsasalaysay gaya ng mga sumusunod:`,
+				},
+				],
 			},
 		];
 
@@ -205,17 +249,18 @@ app.post('/api/generate', async (req, res) => {
 				]
 			},
 			{
-				"type": "paragraph",
-				"align": "justify",
-				"children": [
-					{
-						"text": "SA KATUNAYAN NG LAHAT",
-						"bold": true
-					},
-					{
-						"text": ` ay lumagda ako ng aking pangalan at apelyido ngayong ika-${reportDate.getDate()} ng ${reportDate.getMonth()} ${reportDate.getFullYear()} dito sa ${municipalityProvinceFormatter(details.incidentLocation)}.`
-					}
-				]
+				type: "paragraph",
+				align: "justify",
+				children: [
+				{ text: "SA KATUNAYAN NG LAHAT", bold: true },
+				{
+					text:
+					` ay lumagda ako ng aking pangalan at apelyido ngayong ika-` +
+					`${safe(reportDate?.getDate(), "[MISSING DAY]")} ng ` +
+					`${reportDate ? monthName(reportDate) : "[MISSING MONTH]"} ` +
+					`${safe(reportDate?.getFullYear(), "[MISSING YEAR]")} dito sa ${incPlace}.`,
+				},
+				],
 			},
 			{
 				"type": "paragraph",
@@ -226,15 +271,7 @@ app.post('/api/generate', async (req, res) => {
 					}
 				]
 			},
-			{
-				"type": "paragraph",
-				"align": "right",
-				"children": [
-					{
-						"text": `${details.poseurBuyer?.fullName}` // WARN: hard coded to take the first arresting officer.
-					}
-				]
-			},
+ 			{ type: "paragraph", align: "right", children: [{ text: safe(details?.poseurBuyer?.fullName, "[MISSING NAME]") }] },
 			{
 				"type": "paragraph",
 				"align": "right",
@@ -256,13 +293,20 @@ app.post('/api/generate', async (req, res) => {
 				]
 			},
 			{
-				"type": "paragraph",
-				"align": "justify",
-				"children": [
-					{
-						"text": `SWORN AND SUBSCRIBED TO BEFORE ME this ${reportDate.getDate()} day of ${reportDate.getMonth()} ${reportDate.getFullYear()} at ${municipalityProvinceFormatter(station.address)} and further certify that I personally examined the affaint and that I am fully satisfied that she voluntarily executed and understood the contents of the foregoing statements.`
-					}
-				]
+				type: "paragraph",
+				align: "justify",
+				children: [
+				{
+					text:
+					`SWORN AND SUBSCRIBED TO BEFORE ME this ` +
+					`${safe(reportDate?.getDate(), "[MISSING DAY]")} day of ` +
+					`${reportDate ? monthName(reportDate) : "[MISSING MONTH]"} ` +
+					`${safe(reportDate?.getFullYear(), "[MISSING YEAR]")} at ` +
+					`${safe(stationAddr, "[MISSING STATION ADDRESS]")} and further certify that ` +
+					`I personally examined the affiant and that I am fully satisfied that ` +
+					`he/she voluntarily executed and understood the contents of the foregoing statements.`,
+				},
+				],
 			},
 			{
 				"type": "paragraph",
@@ -273,15 +317,7 @@ app.post('/api/generate', async (req, res) => {
 					}
 				]
 			},
-			{
-				"type": "paragraph",
-				"align": "right",
-				"children": [
-					{
-						"text": `${details.assignedOfficer.fullName}`
-					}
-				]
-			},
+			{ type: "paragraph", align: "right", children: [{ text: assignedOfficerName }] },
 			{
 				"type": "paragraph",
 				"align": "right",
