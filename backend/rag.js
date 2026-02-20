@@ -1,7 +1,5 @@
 const fs = require("fs");
 const path = require("path");
-const pdfParseModule = require("pdf-parse");
-const pdfParse = pdfParseModule.default ?? pdfParseModule;
 
 const { Document } = require("@langchain/core/documents");
 const { RecursiveCharacterTextSplitter } = require("@langchain/textsplitters");
@@ -19,12 +17,20 @@ const embeddings = new OllamaEmbeddings({
 let storePromise = null;
 
 
-async function loadPdfText(filePath) {
-  const buf = fs.readFileSync(filePath);
-  const parsed = await pdfParse(buf);
-  return (parsed.text || "").trim();
+async function parsePdf(buffer) {
+  const mod = await import("pdf-parse");           // ESM-safe
+  const fn = mod.default ?? mod;                   // handle both shapes
+  if (typeof fn !== "function") {
+    throw new TypeError(`pdf-parse export is not a function. Keys: ${Object.keys(mod).join(", ")}`);
+  }
+  return fn(buffer);
 }
 
+async function loadPdfText(filePath) {
+  const buf = fs.readFileSync(filePath);
+  const parsed = await parsePdf(buf);
+  return (parsed.text || "").trim();
+}
 async function getStore() {
   if (storePromise) return storePromise;
 
