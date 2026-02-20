@@ -2,7 +2,7 @@ const express = require('express');
 const {Ollama} = require('ollama');
 const z = require('zod');
 const fs = require('fs');
-
+const { retrieveContext } = require("./rag");
 
 const CustomTextSchema = z.object({
 	  text: z.string(),
@@ -78,20 +78,49 @@ app.post('/api/generate', async (req, res) => {
 		console.log('Generating Report...');
     console.log(details);
     const ollama = new Ollama({fetch: fetchWithTimeout});
-		const response = await ollama.chat({
-			model: 'gemma3:latest',
-			messages: [
-				{role: 'system', content: systemPrompt},
-				{role: 'user', content: JSON.stringify(details)},
-			],
-			format: z.toJSONSchema(CustomElementArraySchema),
-		});
+	// Build a retrieval query from your case details (tune this!)
+	const ragQuery = [
+		details.crime,
+		details.place,
+		details.weapon,
+		details.suspect,
+		details.victim,
+		"affidavit",
+		"elements of the crime",
+		"procedure",
+		].filter(Boolean).join(" | ");
 
-		const narrative = JSON.parse(response.message.content);
-		for (var i = 0; i < narrative.length; i++) {
-			narrative[i].children[0].text = (i + 1).toString() + ". " + narrative[i].children[0].text;
-		}
-		narrative.forEach((event) => console.log(event));
+	const { context } = await retrieveContext(ragQuery, 5);
+
+	// Include the template too (right now you only log it)
+	const userPayload = {
+		caseDetails: details,
+		template: JSON.parse(template), // or template string
+		referenceMaterials: context,
+		};
+
+	const response = await ollama.chat({
+		model: "gemma3:latest",
+		messages: [
+			{
+			role: "system",
+			content:
+				systemPrompt +
+				"\n\nRULES:\n" +
+				"1) Use ONLY the provided caseDetails and referenceMaterials.\n" +
+				"2) If a fact is not explicitly in those, underline it.\n" +
+				"3) Output must match the JSON schema.\n",
+			},
+			{ role: "user", content: JSON.stringify(userPayload) },
+		],
+		format: z.toJSONSchema(CustomElementArraySchema),
+	});
+
+	const narrative = JSON.parse(response.message.content);
+	for (var i = 0; i < narrative.length; i++) {
+		narrative[i].children[0].text = (i + 1).toString() + ". " + narrative[i].children[0].text;
+	}
+	narrative.forEach((event) => console.log(event));
 
     // dummy narrative
     // const narrative = "NARRATIVE";
@@ -304,64 +333,29 @@ const AskSchema = z.object({
   question: z.string().min(1, "question is required"),
 });
 
-// Put this below your /api/generate route (or above; Express doesn’t care)
-app.post('/api/ask', async (req, res) => {
+app.post("/api/ask", async (req, res) => {
   try {
     const parsed = AskSchema.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({
-        error: 'Invalid request body',
-        details: parsed.error.flatten(),
-      });
+      return res.status(400).json({ error: "Invalid request body", details: parsed.error.flatten() });
     }
 
     const { question } = parsed.data;
 
+    const { context } = await retrieveContext(question, 5);
+
     const ollama = new Ollama({ fetch: fetchWithTimeout });
-
     const response = await ollama.chat({
-      model: 'gemma3:latest',
+      model: "gemma3:latest",
       messages: [
-        { role: 'system', content: 'You are a helpful assistant. Reply in plain text.' },
-        { role: 'user', content: question },
+        { role: "system", content: "Answer using ONLY the provided context. If missing, say you don't know." },
+        { role: "user", content: `CONTEXT:\n${context}\n\nQUESTION:\n${question}` },
       ],
-      // No JSON format here—just let the model answer normally.
     });
 
-    const answer = (response?.message?.content ?? '').trim();
-
-    return res.status(200).json({
-      answer,
-      // Optional debug metadata:
-      model: 'gemma3:latest',
-      total_duration_s: response?.total_duration
-        ? response.total_duration / 1_000_000_000
-        : undefined,
-    });
-  } catch (error) {
-    console.error('Error calling Ollama (/api/ask):', error);
-
-    if (error.code === 'UND_ERR_HEADERS_TIMEOUT') {
-      return res.status(504).json({
-        error: 'Ollama request timeout',
-        message: 'The request took too long. Try a smaller model or simpler question.',
-      });
-    }
-
-    if (
-      typeof error?.message === 'string' &&
-      (error.message.includes('fetch failed') || error.message.includes('connect'))
-    ) {
-      return res.status(503).json({
-        error: 'Ollama service unavailable',
-        message: 'Make sure Ollama is running. Run "ollama serve" in terminal.',
-      });
-    }
-
-    return res.status(500).json({
-      error: 'Ask failed',
-      message: error?.message ?? String(error),
-    });
+    return res.status(200).json({ answer: (response?.message?.content ?? "").trim() });
+  } catch (e) {
+    return res.status(500).json({ error: "Ask failed", message: e?.message ?? String(e) });
   }
 });
 
