@@ -1,51 +1,32 @@
 const fs = require("fs");
 const path = require("path");
-
-const { Document } = require("langchain/document");
-const { RecursiveCharacterTextSplitter } = require("langchain/text_splitter");
-
-const { Chroma } = require("@langchain/community/vectorstores/chroma");
-const { OllamaEmbeddings } = require("@langchain/community/embeddings/ollama");
-
 const pdfParse = require("pdf-parse");
 
-const DATA_DIR = path.join(process.cwd(), "data");            // your PDFs folder
-const CHROMA_DIR = path.join(process.cwd(), "chroma_store"); // persistent local store
-const COLLECTION = "affidavit_pdfs";
+const { Document } = require("@langchain/core/documents");
+const { RecursiveCharacterTextSplitter } = require("@langchain/textsplitters");
+
+const { OllamaEmbeddings } = require("@langchain/community/embeddings/ollama");
+const { MemoryVectorStore } = require("@langchain/core/vectorstores");
+
+const DATA_DIR = path.join(process.cwd(), "data");
 
 const embeddings = new OllamaEmbeddings({
   model: "nomic-embed-text",
-  // baseUrl: "http://localhost:11434", // set if not default
+  // baseUrl: "http://localhost:11434",
 });
 
-let vectorStorePromise = null;
+let storePromise = null;
 
-/** Load PDF -> text (simple; assumes text-based PDFs). */
 async function loadPdfText(filePath) {
   const buf = fs.readFileSync(filePath);
   const parsed = await pdfParse(buf);
-  const text = (parsed.text || "").trim();
-  return text;
+  return (parsed.text || "").trim();
 }
 
-/** Build or load a persistent vector store. */
-async function getVectorStore() {
-  if (vectorStorePromise) return vectorStorePromise;
+async function getStore() {
+  if (storePromise) return storePromise;
 
-  vectorStorePromise = (async () => {
-    // Load existing store if present
-    const store = await Chroma.fromExistingCollection(embeddings, {
-      collectionName: COLLECTION,
-      url: "http://localhost:8000", // if using chroma server
-      // For local embedded chroma, you'd configure differently.
-      // If you don’t want a server, see note below.
-    });
-
-    // Quick probe: if empty, index PDFs
-    const probe = await store.similaritySearch("probe", 1).catch(() => []);
-    if (probe.length > 0) return store;
-
-    // Index PDFs
+  storePromise = (async () => {
     if (!fs.existsSync(DATA_DIR)) {
       throw new Error(`PDF folder not found: ${DATA_DIR}`);
     }
@@ -62,7 +43,7 @@ async function getVectorStore() {
     const docs = [];
     for (const filePath of pdfFiles) {
       const text = await loadPdfText(filePath);
-      if (!text || text.length < 50) continue; // likely scanned / unreadable
+      if (!text || text.length < 50) continue; // scanned PDFs often land here
       docs.push(
         new Document({
           pageContent: text,
@@ -72,9 +53,7 @@ async function getVectorStore() {
     }
 
     if (docs.length === 0) {
-      throw new Error(
-        "No extractable text found. PDFs may be scanned images (needs OCR)."
-      );
+      throw new Error("No extractable text found. PDFs may be scanned (needs OCR).");
     }
 
     const splitter = new RecursiveCharacterTextSplitter({
@@ -84,24 +63,17 @@ async function getVectorStore() {
 
     const chunks = await splitter.splitDocuments(docs);
 
-    // Create fresh collection + add documents
-    const fresh = await Chroma.fromDocuments(chunks, embeddings, {
-      collectionName: COLLECTION,
-      url: "http://localhost:8000",
-    });
-
-    return fresh;
+    // In-memory store (simple + zero extra infrastructure)
+    return MemoryVectorStore.fromDocuments(chunks, embeddings);
   })();
 
-  return vectorStorePromise;
+  return storePromise;
 }
 
-/** Retrieve top-k relevant chunks. */
 async function retrieveContext(query, k = 4) {
-  const store = await getVectorStore();
+  const store = await getStore();
   const hits = await store.similaritySearch(query, k);
 
-  // Build a clean context string + keep sources
   const context = hits
     .map((d, i) => {
       const src = d.metadata?.source ? `SOURCE: ${d.metadata.source}` : "SOURCE: unknown";
@@ -112,4 +84,4 @@ async function retrieveContext(query, k = 4) {
   return { context, hits };
 }
 
-module.exports = { retrieveContext, getVectorStore };
+module.exports = { retrieveContext };
