@@ -126,7 +126,10 @@ app.post('/api/generate', async (req, res) => {
 				"\n\nRULES:\n" +
 				"1) Use ONLY the provided caseDetails and referenceMaterials.\n" +
 				"2) If a fact is not explicitly in those, underline it.\n" +
-				"3) Output must match the JSON schema.\n",
+				"3) Output must match the JSON schema.\n" +
+				"4) Remove duplicate information from the narrative.\n" +
+				"5) If the caseDetails are missing key information, do not fabricate it. Just leave it out or say it's missing.\n" +
+				"6) The narrative should be in Tagalog.\n\n" 
 			},
 			{ role: "user", content: JSON.stringify(userPayload) },
 		],
