@@ -79,7 +79,7 @@ app.post('/api/generate', async (req, res) => {
     console.log(details);
     const ollama = new Ollama({fetch: fetchWithTimeout});
 		const response = await ollama.chat({
-			model: 'gemma3:4b',
+			model: 'gemma3:latest',
 			messages: [
 				{role: 'system', content: systemPrompt},
 				{role: 'user', content: JSON.stringify(details)},
@@ -158,7 +158,7 @@ app.post('/api/generate', async (req, res) => {
 				"align": "justify",
 				"children": [
 					{
-						"text": `AKO, ${details.arrestingOfficers[0]?.fullName.toUpperCase()} ${new Date().getFullYear() - new Date(details.arrestingOfficers[0]?.dateOfBirth).getFullYear()} taong-gulang, kagawad ng Pulisya at nakatalaga sa ${details.arrestingOfficers[0]?.unitOrStation}, naninirahan sa ${municipalityProvinceFormatter(details.arrestingOfficers[0]?.address)}, matapos na makapanumpa alinsunod sa ipinag-uutos ng Saligang Batas ng Plilipinas ay malaya at kusang loob na nagsasalaysay gaya ng mga sumusunod:` // WARN: NOT PRECISE AGE
+						"text": `AKO, ${details.poseurBuyer?.fullName.toUpperCase()} ${new Date().getFullYear() - new Date(details.poseurBuyer?.dateOfBirth).getFullYear()} taong-gulang, kagawad ng Pulisya at nakatalaga sa ${details.poseurBuyer?.unitOrStation}, naninirahan sa ${municipalityProvinceFormatter(details.poseurBuyer?.address)}, matapos na makapanumpa alinsunod sa ipinag-uutos ng Saligang Batas ng Plilipinas ay malaya at kusang loob na nagsasalaysay gaya ng mga sumusunod:` // WARN: NOT PRECISE AGE
 					}
 				]
 			},
@@ -202,7 +202,7 @@ app.post('/api/generate', async (req, res) => {
 				"align": "right",
 				"children": [
 					{
-						"text": `${details.arrestingOfficers[0]?.fullName}` // WARN: hard coded to take the first arresting officer.
+						"text": `${details.poseurBuyer?.fullName}` // WARN: hard coded to take the first arresting officer.
 					}
 				]
 			},
