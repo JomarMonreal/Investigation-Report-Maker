@@ -17,20 +17,14 @@ const embeddings = new OllamaEmbeddings({
 let storePromise = null;
 
 
-async function parsePdf(buffer) {
-  const mod = await import("pdf-parse");           // ESM-safe
-  const fn = mod.default ?? mod;                   // handle both shapes
-  if (typeof fn !== "function") {
-    throw new TypeError(`pdf-parse export is not a function. Keys: ${Object.keys(mod).join(", ")}`);
-  }
-  return fn(buffer);
-}
+const pdfParse = require("pdf-parse");
 
 async function loadPdfText(filePath) {
   const buf = fs.readFileSync(filePath);
-  const parsed = await parsePdf(buf);
+  const parsed = await pdfParse(buf);
   return (parsed.text || "").trim();
 }
+
 async function getStore() {
   if (storePromise) return storePromise;
 
