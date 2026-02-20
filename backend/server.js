@@ -300,6 +300,71 @@ app.post('/api/generate', async (req, res) => {
 
 });
 
+const AskSchema = z.object({
+  question: z.string().min(1, "question is required"),
+});
+
+// Put this below your /api/generate route (or above; Express doesn’t care)
+app.post('/api/ask', async (req, res) => {
+  try {
+    const parsed = AskSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: 'Invalid request body',
+        details: parsed.error.flatten(),
+      });
+    }
+
+    const { question } = parsed.data;
+
+    const ollama = new Ollama({ fetch: fetchWithTimeout });
+
+    const response = await ollama.chat({
+      model: 'gemma3:latest',
+      messages: [
+        { role: 'system', content: 'You are a helpful assistant. Reply in plain text.' },
+        { role: 'user', content: question },
+      ],
+      // No JSON format here—just let the model answer normally.
+    });
+
+    const answer = (response?.message?.content ?? '').trim();
+
+    return res.status(200).json({
+      answer,
+      // Optional debug metadata:
+      model: 'gemma3:latest',
+      total_duration_s: response?.total_duration
+        ? response.total_duration / 1_000_000_000
+        : undefined,
+    });
+  } catch (error) {
+    console.error('Error calling Ollama (/api/ask):', error);
+
+    if (error.code === 'UND_ERR_HEADERS_TIMEOUT') {
+      return res.status(504).json({
+        error: 'Ollama request timeout',
+        message: 'The request took too long. Try a smaller model or simpler question.',
+      });
+    }
+
+    if (
+      typeof error?.message === 'string' &&
+      (error.message.includes('fetch failed') || error.message.includes('connect'))
+    ) {
+      return res.status(503).json({
+        error: 'Ollama service unavailable',
+        message: 'Make sure Ollama is running. Run "ollama serve" in terminal.',
+      });
+    }
+
+    return res.status(500).json({
+      error: 'Ask failed',
+      message: error?.message ?? String(error),
+    });
+  }
+});
+
 app.listen(PORT, (error) => {
 	if (!error)
 		console.log("Server is running. App is listening at port " + PORT);
