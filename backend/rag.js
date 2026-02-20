@@ -3,69 +3,62 @@ const path = require("path");
 
 const { Document } = require("@langchain/core/documents");
 const { RecursiveCharacterTextSplitter } = require("@langchain/textsplitters");
-
 const { OllamaEmbeddings } = require("@langchain/ollama");
 const { MemoryVectorStore } = require("@langchain/core/vectorstores");
+
+// ✅ pdf-parse v2.x exports an object containing PDFParse
+const { PDFParse } = require("pdf-parse");
 
 const DATA_DIR = path.join(process.cwd(), "data");
 
 const embeddings = new OllamaEmbeddings({
   model: "nomic-embed-text",
-  // baseUrl: "http://localhost:11434",
 });
 
 let storePromise = null;
 
-
-const pdfParse = require("pdf-parse");
-
 async function loadPdfText(filePath) {
   const buf = fs.readFileSync(filePath);
-  const parsed = await pdfParse(buf);
-  return (parsed.text || "").trim();
+
+  // v2.x API
+  const parser = new PDFParse({ data: buf });
+
+  try {
+    const out = await parser.getText();     // { text, ... }
+    return (out?.text || "").trim();
+  } finally {
+    // avoid memory leaks on large PDFs
+    await parser.destroy?.();
+  }
 }
 
 async function getStore() {
   if (storePromise) return storePromise;
 
   storePromise = (async () => {
-    if (!fs.existsSync(DATA_DIR)) {
-      throw new Error(`PDF folder not found: ${DATA_DIR}`);
-    }
+    if (!fs.existsSync(DATA_DIR)) throw new Error(`PDF folder not found: ${DATA_DIR}`);
 
     const pdfFiles = fs
       .readdirSync(DATA_DIR)
       .filter((f) => f.toLowerCase().endsWith(".pdf"))
       .map((f) => path.join(DATA_DIR, f));
 
-    if (pdfFiles.length === 0) {
-      throw new Error(`No PDFs found in: ${DATA_DIR}`);
-    }
+    if (pdfFiles.length === 0) throw new Error(`No PDFs found in: ${DATA_DIR}`);
 
     const docs = [];
     for (const filePath of pdfFiles) {
       const text = await loadPdfText(filePath);
-      if (!text || text.length < 50) continue; // scanned PDFs often land here
-      docs.push(
-        new Document({
-          pageContent: text,
-          metadata: { source: path.basename(filePath) },
-        })
-      );
+      if (!text || text.length < 50) continue;
+      docs.push(new Document({ pageContent: text, metadata: { source: path.basename(filePath) } }));
     }
 
     if (docs.length === 0) {
       throw new Error("No extractable text found. PDFs may be scanned (needs OCR).");
     }
 
-    const splitter = new RecursiveCharacterTextSplitter({
-      chunkSize: 1000,
-      chunkOverlap: 150,
-    });
-
+    const splitter = new RecursiveCharacterTextSplitter({ chunkSize: 1000, chunkOverlap: 150 });
     const chunks = await splitter.splitDocuments(docs);
 
-    // In-memory store (simple + zero extra infrastructure)
     return MemoryVectorStore.fromDocuments(chunks, embeddings);
   })();
 
