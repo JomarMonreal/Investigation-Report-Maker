@@ -89,7 +89,7 @@ app.post('/api/generate', async (req, res) => {
 			return res.status(500).json({ error: 'Template file not found' });
 		}
 
-
+	const details = req.body.caseDetails ? req.body.caseDetails : dummyDetails;
 	console.log(systemPrompt + template);
 	console.log('Generating Report...');
     console.log(details);
@@ -152,7 +152,6 @@ app.post('/api/generate', async (req, res) => {
     reportDate = new Date(details.reportDate);
     indidentDate = new Date(details.incidentDate);
 
-	const details = req.body.caseDetails ? req.body.caseDetails : dummyDetails;
 	const station = req.body.policeStation
 	? req.body.policeStation
 	: { name: "Los Banos Police Station", address: { cityOrMunicipality: "Los Banos", province: "Laguna" } };
