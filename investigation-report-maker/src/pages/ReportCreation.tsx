@@ -110,10 +110,15 @@ const ReportCreation: React.FC = () => {
     setModeDialogOpen(false);
     try {
       setIsFetching(true);
+      const stationPayload =
+        policeStation && typeof policeStation.address === "object" && policeStation.address
+          ? policeStation
+          : caseDetails.policeStation;
+
       const httpResponse = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ caseDetails, policeStation, systemPrompt }),
+        body: JSON.stringify({ caseDetails, policeStation: stationPayload, systemPrompt }),
       });
       const response = await httpResponse.json().catch(() => null);
       if (!httpResponse.ok) {

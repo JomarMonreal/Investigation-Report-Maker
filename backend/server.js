@@ -33,9 +33,45 @@ const dummyDetails = {
 	victim: "Asher Hernandez",
 };
 
+const resolveAddressObject = (value) => {
+  if (!value || typeof value !== "object") return null;
+
+  if ("cityOrMunicipality" in value || "province" in value) {
+    return value;
+  }
+
+  if ("completeAddress" in value && value.completeAddress && typeof value.completeAddress === "object") {
+    return value.completeAddress;
+  }
+
+  if ("address" in value && value.address && typeof value.address === "object") {
+    return value.address;
+  }
+
+  return null;
+};
+
+const extractMunicipalityProvince = (value) => {
+  const location = resolveAddressObject(value);
+  if (!location) return { municipality: undefined, province: undefined };
+
+  const municipality =
+    location.cityOrMunicipality ??
+    location.cityMunicipality ??
+    location.municipality ??
+    location.city ??
+    location.town;
+
+  const province =
+    location.province ??
+    location.prov ??
+    location.state;
+
+  return { municipality, province };
+};
+
 const municipalityProvinceFormatter = (incidentLocation) => {
-  const muni = incidentLocation?.cityOrMunicipality;
-  const province = incidentLocation?.province;
+  const { municipality: muni, province } = extractMunicipalityProvince(incidentLocation);
   return `${safe(muni, "[MISSING MUNICIPALITY]")}, ${safe(province, "[MISSING PROVINCE]")}`;
 };
 
@@ -59,7 +95,14 @@ const fetchWithTimeout = (url, init = {}) => {
 
 const safe = (v, placeholder = "[MISSING]") => {
   if (v === null || v === undefined) return placeholder;
-  if (typeof v === "string" && v.trim() === "") return placeholder;
+  if (typeof v === "string") {
+    const trimmed = v.trim();
+    if (!trimmed) return placeholder;
+    if (trimmed.toLowerCase() === "undefined" || trimmed.toLowerCase() === "null") {
+      return placeholder;
+    }
+    return trimmed;
+  }
   return String(v);
 };
 
@@ -73,6 +116,19 @@ const safeDate = (v) => {
 // Month name (Tagalog-friendly output later if you want)
 const monthName = (d) =>
   d ? d.toLocaleString("en-US", { month: "long" }) : "[MISSING MONTH]";
+
+const formatAddressForReport = (value) => {
+  if (typeof value === "string") {
+    return safe(value, "[MISSING ADDRESS]");
+  }
+
+  const location = resolveAddressObject(value);
+  if (!location) {
+    return municipalityProvinceFormatter(value);
+  }
+
+  return municipalityProvinceFormatter(location);
+};
 
 let cachedTemplate = null;
 
@@ -164,18 +220,19 @@ app.post('/api/generate', async (req, res) => {
 	const poseurDob = safeDate(details?.poseurBuyer?.dateOfBirth);
 	const poseurAge = poseurDob ? new Date().getFullYear() - poseurDob.getFullYear() : "[MISSING AGE]";
 	const poseurUnit = safe(details?.poseurBuyer?.unitOrStation, "[MISSING UNIT/STATION]");
-	const poseurAddr = municipalityProvinceFormatter(details?.poseurBuyer?.address);
+	const poseurAddr = formatAddressForReport(details?.poseurBuyer);
 
 	// Incident location safe fields
-	const incProvince = safe(details?.incidentLocation?.province, "[MISSING PROVINCE]");
-	const incMuni = safe(details?.incidentLocation?.cityOrMunicipality, "[MISSING MUNICIPALITY]");
+  const {
+    municipality: incidentMunicipality,
+    province: incidentProvince,
+  } = extractMunicipalityProvince(details?.incidentLocation);
+	const incProvince = safe(incidentProvince, "[MISSING PROVINCE]");
+	const incMuni = safe(incidentMunicipality, "[MISSING MUNICIPALITY]");
 	const incPlace = municipalityProvinceFormatter(details?.incidentLocation);
 
 	// Station address could be a string or an object—support both
-	const stationAddr =
-	typeof station?.address === "string"
-		? station.address
-		: municipalityProvinceFormatter(station?.address);
+	const stationAddr = formatAddressForReport(station);
 
 	// Assigned officer safe
 	const assignedOfficerName = safe(details?.assignedOfficer?.fullName, "[MISSING OFFICER NAME]");
