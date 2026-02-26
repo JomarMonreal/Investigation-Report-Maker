@@ -15,7 +15,7 @@ import {
   DialogActions,
   Button,
   Typography,
-  Box,
+  Stack,
 } from "@mui/material";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import CaseDetailsForm from "../components/CaseDetailsForm";
@@ -48,6 +48,14 @@ const isServerUnavailable = (err: unknown): boolean => {
     message.includes("request failed (503)") ||
     message.includes("request failed (504)")
   );
+};
+
+type AffidavitKind = "poseur-buyer" | "complainant" | "witness";
+
+const AFFIDAVIT_ENDPOINT: Record<AffidavitKind, string> = {
+  "poseur-buyer": "/api/generate/poseur-buyer",
+  complainant: "/api/generate/complainant",
+  witness: "/api/generate/witness",
 };
 
 const ReportCreation: React.FC = () => {
@@ -101,10 +109,7 @@ const ReportCreation: React.FC = () => {
     setFiscalOpen(true);
   }, [setSlateValue]);
 
-  // -------------------------------------------------------------------------
-  // AI mode: call your /api/generate endpoint
-  // -------------------------------------------------------------------------
-  const handleGenerateReportAIMode = React.useCallback(async () => {
+  const handleGenerateByKind = React.useCallback(async (kind: AffidavitKind) => {
     if (isGeneratingRef.current) return;
     isGeneratingRef.current = true;
     setModeDialogOpen(false);
@@ -115,7 +120,7 @@ const ReportCreation: React.FC = () => {
           ? policeStation
           : caseDetails.policeStation;
 
-      const httpResponse = await fetch("/api/generate", {
+      const httpResponse = await fetch(AFFIDAVIT_ENDPOINT[kind], {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ caseDetails, policeStation: stationPayload, systemPrompt }),
@@ -158,7 +163,7 @@ const ReportCreation: React.FC = () => {
       if (isServerUnavailable(err)) {
         await sleep(1000);
       }
-      alert(`Failed to generate report: ${err instanceof Error ? err.message : "Unknown error"}`);
+      alert(`Failed to generate ${kind} affidavit: ${err instanceof Error ? err.message : "Unknown error"}`);
     } finally {
       isGeneratingRef.current = false;
       setIsFetching(false);
@@ -230,19 +235,37 @@ const ReportCreation: React.FC = () => {
 
         {/* Generate mode selection dialog */}
         <Dialog open={modeDialogOpen} onClose={handleCloseGenerateDialog} fullWidth maxWidth="sm">
-          <DialogTitle>Generate Report</DialogTitle>
+          <DialogTitle>Generate Affidavit</DialogTitle>
           <DialogContent dividers>
-            <Box mb={3}>
-              <Typography variant="subtitle1" gutterBottom>
-                AI Mode
+            <Stack spacing={1.5}>
+              <Typography variant="subtitle1">
+                Select affidavit to generate
               </Typography>
-              <Typography variant="body2" paragraph>
-                Gumamit ng AI upang awtomatikong buuin ang buong ulat mula sa mga detalye ng kaso.
-              </Typography>
-              <Button variant="contained" fullWidth onClick={handleGenerateReportAIMode} disabled={isFetching}>
-                Use AI Mode
+              <Button
+                variant="contained"
+                fullWidth
+                onClick={() => void handleGenerateByKind("complainant")}
+                disabled={isFetching}
+              >
+                Generate affidavit of complainant
               </Button>
-            </Box>
+              <Button
+                variant="contained"
+                fullWidth
+                onClick={() => void handleGenerateByKind("witness")}
+                disabled={isFetching}
+              >
+                Generate affidavit of witness
+              </Button>
+              <Button
+                variant="contained"
+                fullWidth
+                onClick={() => void handleGenerateByKind("poseur-buyer")}
+                disabled={isFetching}
+              >
+                Generate affidavit of poseur buyer
+              </Button>
+            </Stack>
           </DialogContent>
           <DialogActions>
             <Button onClick={handleCloseGenerateDialog} disabled={isFetching}>Close</Button>
