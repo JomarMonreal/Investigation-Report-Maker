@@ -35,9 +35,10 @@ const ReportCreation: React.FC = () => {
 
   // Slate
   const [resultEditor] = React.useState(() => withReact(createEditor()));
-  const [resultValue, setResultValue] = React.useState<CustomElement[]>([
+  const initialResultValue = React.useMemo<CustomElement[]>(() => [
     { type: "paragraph", children: [{ text: "Start typing or load a template..." }] },
-  ]);
+  ], []);
+  const latestResultValueRef = React.useRef<CustomElement[]>(initialResultValue);
 
   const { caseDetails, setCaseDetails, setIsFetching, setSlateValue } = useCaseDetails();
   const { policeStation } = usePoliceOfficer();
@@ -66,6 +67,15 @@ const ReportCreation: React.FC = () => {
     // reset cache when chip x is clicked
   }, []);
 
+  const handleSlateChange = React.useCallback((value: Descendant[]) => {
+    latestResultValueRef.current = value as CustomElement[];
+  }, []);
+
+  const handleOpenFiscalDrawer = React.useCallback(() => {
+    setSlateValue(latestResultValueRef.current);
+    setFiscalOpen(true);
+  }, [setSlateValue]);
+
   // -------------------------------------------------------------------------
   // AI mode: call your /api/generate endpoint
   // -------------------------------------------------------------------------
@@ -81,6 +91,7 @@ const ReportCreation: React.FC = () => {
 
       const parsed = JSON.parse(response.message.content);
       const nodes = parsed as Descendant[];
+      latestResultValueRef.current = nodes as CustomElement[];
 
       Editor.withoutNormalizing(resultEditor, () => {
         Transforms.select(resultEditor, {
@@ -97,13 +108,13 @@ const ReportCreation: React.FC = () => {
       }
 
       setView("result");
-      setSlateValue(resultValue);
-      setIsFetching(false);
+      setSlateValue(nodes);
     } catch (err) {
       alert(`Failed to generate report: ${err instanceof Error ? err.message : "Unknown error"}`);
+    } finally {
       setIsFetching(false);
     }
-  }, [setIsFetching, caseDetails, policeStation, resultEditor, title, setSlateValue, resultValue]);
+  }, [setIsFetching, caseDetails, policeStation, resultEditor, title, setSlateValue]);
 
   // -------------------------------------------------------------------------
   // Template load error
@@ -192,8 +203,8 @@ const ReportCreation: React.FC = () => {
         {/* Main layout */}
         <Slate
           editor={resultEditor}
-          initialValue={resultValue}
-          onChange={(value) => setResultValue(value as CustomElement[])}
+          initialValue={initialResultValue}
+          onChange={handleSlateChange}
         >
           <DocScaffoldLoad
             title={title}
@@ -220,7 +231,7 @@ const ReportCreation: React.FC = () => {
                 <Button
                   variant="outlined"
                   size="small"
-                  onClick={() => setFiscalOpen(true)}
+                  onClick={handleOpenFiscalDrawer}
                   sx={{ mr: 1 }}
                 >
                   Virtual Fiscal

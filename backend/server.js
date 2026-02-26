@@ -2,6 +2,7 @@ const express = require('express');
 const {Ollama} = require('ollama');
 const z = require('zod');
 const fs = require('fs');
+const path = require('path');
 const { retrieveContext } = require("./rag");
 
 const CustomTextSchema = z.object({
@@ -41,6 +42,7 @@ const municipalityProvinceFormatter = (incidentLocation) => {
 
 const app = express();
 const PORT = 3000;
+const TEMPLATE_PATH = path.join(__dirname, 'templates', 'affidavit-of-poseur-buyer.json');
 
 app.use(express.json());
 
@@ -72,29 +74,31 @@ const safeDate = (v) => {
 const monthName = (d) =>
   d ? d.toLocaleString("en-US", { month: "long" }) : "[MISSING MONTH]";
 
+let cachedTemplate = null;
+
+const getTemplate = () => {
+  if (cachedTemplate) return cachedTemplate;
+  const templateData = fs.readFileSync(TEMPLATE_PATH, 'utf8');
+  cachedTemplate = JSON.parse(templateData);
+  return cachedTemplate;
+};
+
+const ollama = new Ollama({ fetch: fetchWithTimeout });
 
 
 app.post('/api/generate', async (req, res) => {
 
 	try {
-		let template = '';
-		
+		let template;
 		try {
-			const templateData = fs.readFileSync('templates/affidavit-of-poseur-buyer.json', 'utf8');
-			const parsedTemplate = JSON.parse(templateData);
-
-			template = JSON.stringify(parsedTemplate, null, 2);
+			template = getTemplate();
 		} catch (err) {
 			console.error('Error reading template:', err);
 			return res.status(500).json({ error: 'Template file not found' });
 		}
 
 	const details = req.body.caseDetails ? req.body.caseDetails : dummyDetails;
-	console.log(systemPrompt + template);
 	console.log('Generating Report...');
-    console.log(details);
-
-    const ollama = new Ollama({fetch: fetchWithTimeout});
 	// Build a retrieval query from your case details (tune this!)
 	const ragQuery = [
 		details.crime,
@@ -112,7 +116,7 @@ app.post('/api/generate', async (req, res) => {
 	// Include the template too (right now you only log it)
 	const userPayload = {
 		caseDetails: details,
-		template: JSON.parse(template), // or template string
+		template,
 		referenceMaterials: context,
 		};
 
@@ -140,16 +144,6 @@ app.post('/api/generate', async (req, res) => {
 	for (var i = 0; i < narrative.length; i++) {
 		narrative[i].children[0].text = (i + 1).toString() + ". " + narrative[i].children[0].text;
 	}
-	narrative.forEach((event) => console.log(event));
-
-    // dummy narrative
-    // const narrative = "NARRATIVE";
-
-
-    console.log("printing events...");
-
-
-    console.log("done printing events...");
 
 
 
@@ -333,11 +327,6 @@ app.post('/api/generate', async (req, res) => {
 			}
 		];
 
-    // let response = {message: {content: {}}};
-    // response.message.content = JSON.stringify(header.concat(narrative, footer));
-
-    console.log(response);
-
 		response.message.content = JSON.stringify(header.concat(narrative, footer));
 		// end of affidavit of poseur buyer specific
 
@@ -445,7 +434,6 @@ app.post("/api/ask", async (req, res) => {
       retrievedContext || "(No retrieved context.)",
     ].join("\n");
 
-    const ollama = new Ollama({ fetch: fetchWithTimeout });
     const response = await ollama.chat({
       model: "gemma3:latest",
       messages: [

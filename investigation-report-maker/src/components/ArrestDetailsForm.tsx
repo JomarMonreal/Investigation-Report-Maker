@@ -285,4 +285,4 @@ const ArrestDetailsForm: React.FC<ArrestDetailsFormProps> = ({
     </Stack>
   );
 };
-export default ArrestDetailsForm;
+export default React.memo(ArrestDetailsForm);

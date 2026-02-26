@@ -122,4 +122,4 @@ const WitnessForm: React.FC<WitnessFormProps> = ({ onChange, witness }) => {
   );
 };
 
-export default WitnessForm;
+export default React.memo(WitnessForm);
