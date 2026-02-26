@@ -26,6 +26,30 @@ import { usePoliceOfficer } from "../hooks/usePoliceOfficer";
 import { MessagingProvider } from "../context/MessagingProvider";
 import { VirtualFiscalDrawer } from "../components/VirtualFiscalDrawer";
 
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
+
+type ErrorWithStatus = Error & { status?: number };
+
+const isServerUnavailable = (err: unknown): boolean => {
+  if (!(err instanceof Error)) return false;
+  const withStatus = err as ErrorWithStatus;
+  if (typeof withStatus.status === "number" && withStatus.status >= 500) {
+    return true;
+  }
+  const message = err.message.toLowerCase();
+  return (
+    message.includes("failed to fetch") ||
+    message.includes("fetch failed") ||
+    message.includes("networkerror") ||
+    message.includes("network request failed") ||
+    message.includes("load failed") ||
+    message.includes("request failed (502)") ||
+    message.includes("request failed (503)") ||
+    message.includes("request failed (504)")
+  );
+};
+
 const ReportCreation: React.FC = () => {
   const [title, setTitle] = React.useState<string>("Untitled Report");
   const [view, setView] = React.useState<ReportView>("details");
@@ -39,8 +63,9 @@ const ReportCreation: React.FC = () => {
     { type: "paragraph", children: [{ text: "Start typing or load a template..." }] },
   ], []);
   const latestResultValueRef = React.useRef<CustomElement[]>(initialResultValue);
+  const isGeneratingRef = React.useRef(false);
 
-  const { caseDetails, setCaseDetails, setIsFetching, setSlateValue } = useCaseDetails();
+  const { caseDetails, setCaseDetails, setIsFetching, setSlateValue, isFetching } = useCaseDetails();
   const { policeStation } = usePoliceOfficer();
 
   // -------------------------------------------------------------------------
@@ -80,14 +105,29 @@ const ReportCreation: React.FC = () => {
   // AI mode: call your /api/generate endpoint
   // -------------------------------------------------------------------------
   const handleGenerateReportAIMode = React.useCallback(async () => {
+    if (isGeneratingRef.current) return;
+    isGeneratingRef.current = true;
     setModeDialogOpen(false);
     try {
       setIsFetching(true);
-      const response = await fetch("/api/generate", {
+      const httpResponse = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ caseDetails, policeStation, systemPrompt }),
-      }).then((res) => res.json());
+      });
+      const response = await httpResponse.json().catch(() => null);
+      if (!httpResponse.ok) {
+        const message =
+          response && typeof response.message === "string"
+            ? response.message
+            : `Request failed (${httpResponse.status})`;
+        const error = new Error(message) as ErrorWithStatus;
+        error.status = httpResponse.status;
+        throw error;
+      }
+      if (!response || !response.message || typeof response.message.content !== "string") {
+        throw new Error("Invalid response from server.");
+      }
 
       const parsed = JSON.parse(response.message.content);
       const nodes = parsed as Descendant[];
@@ -110,8 +150,12 @@ const ReportCreation: React.FC = () => {
       setView("result");
       setSlateValue(nodes);
     } catch (err) {
+      if (isServerUnavailable(err)) {
+        await sleep(1000);
+      }
       alert(`Failed to generate report: ${err instanceof Error ? err.message : "Unknown error"}`);
     } finally {
+      isGeneratingRef.current = false;
       setIsFetching(false);
     }
   }, [setIsFetching, caseDetails, policeStation, resultEditor, title, setSlateValue]);
@@ -190,13 +234,13 @@ const ReportCreation: React.FC = () => {
               <Typography variant="body2" paragraph>
                 Gumamit ng AI upang awtomatikong buuin ang buong ulat mula sa mga detalye ng kaso.
               </Typography>
-              <Button variant="contained" fullWidth onClick={handleGenerateReportAIMode}>
+              <Button variant="contained" fullWidth onClick={handleGenerateReportAIMode} disabled={isFetching}>
                 Use AI Mode
               </Button>
             </Box>
           </DialogContent>
           <DialogActions>
-            <Button onClick={handleCloseGenerateDialog}>Close</Button>
+            <Button onClick={handleCloseGenerateDialog} disabled={isFetching}>Close</Button>
           </DialogActions>
         </Dialog>
 

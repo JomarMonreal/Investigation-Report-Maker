@@ -8,6 +8,29 @@ import type { CaseDetailsSlateValue } from "./CaseDetailsContext";
 const STORAGE_KEY = "virtual_fiscal_messages";
 
 const normalizeContent = (content: string): string => content.trim();
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
+
+type ErrorWithStatus = Error & { status?: number };
+
+const isServerUnavailable = (err: unknown): boolean => {
+  if (!(err instanceof Error)) return false;
+  const withStatus = err as ErrorWithStatus;
+  if (typeof withStatus.status === "number" && withStatus.status >= 500) {
+    return true;
+  }
+  const message = err.message.toLowerCase();
+  return (
+    message.includes("failed to fetch") ||
+    message.includes("fetch failed") ||
+    message.includes("networkerror") ||
+    message.includes("network request failed") ||
+    message.includes("load failed") ||
+    message.includes("request failed (502)") ||
+    message.includes("request failed (503)") ||
+    message.includes("request failed (504)")
+  );
+};
 
 const createMessage = (sender: Message["sender"], content: string): Message => ({
   sender,
@@ -40,7 +63,9 @@ async function askFiscal(question: string, slateValue: CaseDetailsSlateValue, si
       (data && "message" in data && typeof data.message === "string" && data.message) ||
       (data && "error" in data && typeof data.error === "string" && data.error) ||
       `Request failed (${res.status})`;
-    throw new Error(msg);
+    const error = new Error(msg) as ErrorWithStatus;
+    error.status = res.status;
+    throw error;
   }
 
   const answer =
@@ -52,6 +77,7 @@ async function askFiscal(question: string, slateValue: CaseDetailsSlateValue, si
 
 export const MessagingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [messages, setMessages] = useState<Message[]>([]);
+  const [isSending, setIsSending] = useState(false);
   const isHydratedRef = useRef(false);
   const  {slateValue} = useCaseDetails(); // for now we just want to trigger re-render on case details change so messages are cleared, but could be used for more advanced features later
 
@@ -87,14 +113,14 @@ export const MessagingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     async (content: string) => {
       const cleaned = normalizeContent(content);
       if (!cleaned) return;
+      if (abortRef.current) return;
 
       // Add user message immediately
       setMessages((prev) => [...prev, createMessage("you", cleaned)]);
 
-      // Cancel prior request (optional but nice)
-      abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
+      setIsSending(true);
 
       const requestId = ++lastRequestIdRef.current;
 
@@ -122,6 +148,9 @@ export const MessagingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         });
       } catch (err) {
         if (requestId !== lastRequestIdRef.current) return;
+        if (isServerUnavailable(err)) {
+          await sleep(1000);
+        }
 
         const message =
           err instanceof Error ? err.message : "Something went wrong calling /api/ask.";
@@ -138,6 +167,11 @@ export const MessagingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           next.push(createMessage("fiscal", `Error: ${message}`));
           return next;
         });
+      } finally {
+        if (requestId === lastRequestIdRef.current) {
+          abortRef.current = null;
+          setIsSending(false);
+        }
       }
     },
     [send_fiscal_message, slateValue]
@@ -146,14 +180,15 @@ export const MessagingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const clear_messages = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
+    setIsSending(false);
 
     setMessages([]);
     localStorage.removeItem(STORAGE_KEY);
   }, []);
 
   const value = useMemo(
-    () => ({ messages, send_your_message, send_fiscal_message, clear_messages }),
-    [messages, send_your_message, send_fiscal_message, clear_messages]
+    () => ({ messages, isSending, send_your_message, send_fiscal_message, clear_messages }),
+    [messages, isSending, send_your_message, send_fiscal_message, clear_messages]
   );
 
   return <MessagingContext.Provider value={value}>{children}</MessagingContext.Provider>;

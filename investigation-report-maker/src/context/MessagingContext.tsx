@@ -4,6 +4,7 @@ import type { Messages } from "../types/Messages";
 
 export interface MessagingContextProps {
   messages: Messages;
+  isSending: boolean;
   send_your_message: (content: string) => void;
   send_fiscal_message: (content: string) => void;
   clear_messages: () => void;

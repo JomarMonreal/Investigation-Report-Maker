@@ -42,12 +42,12 @@ export const VirtualFiscalDrawer: React.FC<VirtualFiscalDrawerProps> = ({
   onClose,
   width = 420,
 }) => {
-  const { messages, send_your_message } = useMessaging();
+  const { messages, isSending, send_your_message } = useMessaging();
   const [draft, setDraft] = useState<string>("");
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
-  const canSend = useMemo(() => draft.trim().length > 0, [draft]);
+  const canSend = useMemo(() => !isSending && draft.trim().length > 0, [draft, isSending]);
 
   useEffect(() => {
     // Scroll to bottom when messages change or drawer opens
@@ -122,6 +122,7 @@ export const VirtualFiscalDrawer: React.FC<VirtualFiscalDrawerProps> = ({
             onKeyDown={handleKeyDown}
             multiline
             maxRows={4}
+            disabled={isSending}
           />
           <IconButton
             color="primary"
