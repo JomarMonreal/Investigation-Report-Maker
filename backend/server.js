@@ -1,9 +1,7 @@
 const express = require('express');
 const {Ollama} = require('ollama');
 const z = require('zod');
-const fs = require('fs');
-const path = require('path');
-const { retrieveContext } = require("./rag");
+const { retrieveContext, warmRagIndex } = require("./rag");
 
 const CustomTextSchema = z.object({
 	  text: z.string(),
@@ -78,7 +76,10 @@ const municipalityProvinceFormatter = (incidentLocation) => {
 
 const app = express();
 const PORT = 3000;
-const TEMPLATE_PATH = path.join(__dirname, 'templates', 'affidavit-of-poseur-buyer.json');
+const GENERATION_MODEL = process.env.OLLAMA_GENERATION_MODEL || "gemma3:27b";
+const ASK_MODEL = process.env.OLLAMA_ASK_MODEL || "gemma3:latest";
+const OLLAMA_KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE || "30m";
+const ENABLE_STARTUP_WARMUP = (process.env.ENABLE_STARTUP_WARMUP ?? "true").toLowerCase() !== "false";
 
 app.use(express.json());
 
@@ -135,13 +136,24 @@ const formatAddressForReport = (value) => {
   return municipalityProvinceFormatter(location);
 };
 
-let cachedTemplate = null;
+const TEMPLATE_PLACEHOLDER_RE = /{{\s*([^{}]+?)\s*}}/g;
 
-const getTemplate = () => {
-  if (cachedTemplate) return cachedTemplate;
-  const templateData = fs.readFileSync(TEMPLATE_PATH, 'utf8');
-  cachedTemplate = JSON.parse(templateData);
-  return cachedTemplate;
+const normalizePlaceholderKey = (rawKey) =>
+  String(rawKey || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "_");
+
+const getFirstSuspectAlias = (details) => {
+  const suspects = Array.isArray(details?.suspects) ? details.suspects : [];
+  const first = suspects[0];
+  if (!first) return undefined;
+
+  if (Array.isArray(first.aliases)) {
+    const alias = first.aliases.find((x) => typeof x === "string" && x.trim().length > 0);
+    if (alias) return alias;
+  }
+  return first.fullName;
 };
 
 const ollama = new Ollama({ fetch: fetchWithTimeout });
@@ -196,6 +208,124 @@ const getAffiantAge = (affiant) => {
   if (Number.isFinite(affiant?.age)) return Math.floor(affiant.age);
   const dob = safeDate(affiant?.dateOfBirth);
   return dob ? new Date().getFullYear() - dob.getFullYear() : "[MISSING AGE]";
+};
+
+const createPlaceholderMap = ({ details, affiant, station }) => {
+  const reportDate = safeDate(details?.reportDate) || safeDate(details?.incidentDate);
+  const location = municipalityProvinceFormatter(details?.incidentLocation);
+  const targetAlias = getFirstSuspectAlias(details);
+  const assignedOfficerName = details?.assignedOfficer?.fullName;
+  const affiantAge = getAffiantAge(affiant);
+  const affiantAddress = formatAddressForReport(affiant);
+
+  return {
+    ARRESTING_OFFICER_NAME: safe(affiant?.fullName, "[MISSING INFO]"),
+    ARRESTING_OFFICER_AGE: safe(affiantAge, "[MISSING INFO]"),
+    ARRESTING_OFFICER_STATION: safe(affiant?.unitOrStation, "[MISSING INFO]"),
+    ARRESTING_OFFICER_HOME_ADDRESS: safe(affiantAddress, "[MISSING INFO]"),
+    AFFIANT_NAME: safe(affiant?.fullName, "[MISSING INFO]"),
+    AFFIANT_AGE: safe(affiantAge, "[MISSING INFO]"),
+    AFFIANT_STATION: safe(affiant?.unitOrStation, "[MISSING INFO]"),
+    AFFIANT_HOME_ADDRESS: safe(affiantAddress, "[MISSING INFO]"),
+    WITNESS_NAME: safe(affiant?.fullName, "[MISSING INFO]"),
+    COMPLAINANT_NAME: safe(details?.complainant?.fullName, "[MISSING INFO]"),
+    ADMINISTERING_OFFICER_NAME: safe(assignedOfficerName, "[MISSING INFO]"),
+    DAY: safe(reportDate?.getDate(), "[MISSING INFO]"),
+    MONTH: reportDate ? monthName(reportDate) : "[MISSING INFO]",
+    YEAR: safe(reportDate?.getFullYear(), "[MISSING INFO]"),
+    LOCATION: safe(location, "[MISSING INFO]"),
+    TARGET_ALIAS: safe(targetAlias, "[MISSING INFO]"),
+    STATION_NAME: safe(station?.name, "[MISSING INFO]"),
+  };
+};
+
+const replaceTemplatePlaceholders = (text, placeholderMap) =>
+  String(text ?? "").replace(TEMPLATE_PLACEHOLDER_RE, (_m, rawKey) => {
+    const key = normalizePlaceholderKey(rawKey);
+    if (!key) return "[MISSING INFO]";
+    return placeholderMap[key] ?? "[MISSING INFO]";
+  });
+
+const normalizeForFilter = (text) =>
+  String(text || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+
+const isBoilerplateAffidavitLine = (line, placeholderMap) => {
+  const text = normalizeForFilter(line);
+  if (!text) return true;
+
+  const affiantName = normalizeForFilter(placeholderMap?.AFFIANT_NAME);
+  const officerName = normalizeForFilter(placeholderMap?.ADMINISTERING_OFFICER_NAME);
+  if ((affiantName && text === affiantName) || (officerName && text === officerName)) {
+    return true;
+  }
+
+  if (text.startsWith("lalawigan ng ")) return true;
+  if (text.startsWith("bayan ng ")) return true;
+  if (/^x\s*-+\s*x$/.test(text)) return true;
+  if (text === "sinumpaang salaysay") return true;
+  if (text.startsWith("(affidavit of")) return true;
+  if (text.startsWith("sa katunayan ng lahat")) return true;
+  if (text === "(nagsalaysay)") return true;
+  if (text === "certification") return true;
+  if (text === "administering officer") return true;
+  if (text.startsWith("sworn and subscribed to before me")) return true;
+  if (text.startsWith("ako,") && text.includes("malaya at kusang loob na nagsasalaysay")) return true;
+  return false;
+};
+
+const normalizeNarrativeOutput = (parsed, { details, affiant, station }) => {
+  const placeholderMap = createPlaceholderMap({ details, affiant, station });
+  const seenParagraphs = new Set();
+
+  const normalized = parsed
+    .map((node) => {
+      const children = Array.isArray(node.children) ? node.children : [];
+      const normalizedChildren = children
+        .map((child, index) => {
+          if (typeof child?.text !== "string") return { text: "" };
+          const textWithoutList = index === 0
+            ? child.text.replace(LEADING_LIST_MARKER_RE, "").trimStart()
+            : child.text;
+          const cleanedText = replaceTemplatePlaceholders(textWithoutList, placeholderMap);
+          return { ...child, text: cleanedText };
+        })
+        .filter((child) => typeof child.text === "string" && child.text.trim().length > 0);
+
+      const paragraphText = normalizedChildren.map((child) => child.text).join(" ").trim();
+      return {
+        type: "paragraph",
+        align: "justify",
+        children: normalizedChildren,
+        __text: paragraphText,
+      };
+    })
+    .filter((node) => node.children.length > 0)
+    .filter((node) => !isBoilerplateAffidavitLine(node.__text, placeholderMap))
+    .filter((node) => {
+      const key = normalizeForFilter(node.__text);
+      if (!key) return false;
+      if (seenParagraphs.has(key)) return false;
+      seenParagraphs.add(key);
+      return true;
+    })
+    .map(({ __text, ...node }) => node);
+
+  if (normalized.length > 0) {
+    return normalized;
+  }
+
+  const fallbackText = safe(
+    details?.narrative || details?.incidentSummary || details?.evidenceSummary,
+    "[MISSING INFO]",
+  );
+  return [{
+    type: "paragraph",
+    align: "justify",
+    children: [{ text: fallbackText }],
+  }];
 };
 
 const buildAffidavitDocument = ({
@@ -347,19 +477,19 @@ const createRagQuery = (details) => {
     .join(" | ");
 };
 
-const generateNarrative = async (details, template, affidavitKind) => {
+const generateNarrative = async (details, affidavitKind, { affiant, station }) => {
   const ragQuery = createRagQuery(details);
   const { context } = await retrieveContext(ragQuery, 5);
 
   const userPayload = {
     affidavitType: affidavitKind,
     caseDetails: details,
-    template,
     referenceMaterials: context,
   };
 
   const response = await ollama.chat({
-    model: "gemma3:27b",
+    model: GENERATION_MODEL,
+    keep_alive: OLLAMA_KEEP_ALIVE,
     messages: [
       {
         role: "system",
@@ -374,7 +504,8 @@ const generateNarrative = async (details, template, affidavitKind) => {
           "6) Do NOT add numbering or bullets (no '1.', '2)', '-', etc.) on header or footer.\n" +
           "7) Remove duplicate information from the narrative.\n" +
           "8) The narrative should be in Tagalog.\n" +
-          "9) If a fact is not explicitly in caseDetails, set underline: true on the corresponding text.\n\n",
+          "9) If a fact is not explicitly in caseDetails, set underline: true on the corresponding text.\n" +
+          "10) Never output template placeholders like {{...}}. Replace them with real values or [MISSING INFO].\n\n",
       },
       { role: "user", content: JSON.stringify(userPayload) },
     ],
@@ -384,23 +515,7 @@ const generateNarrative = async (details, template, affidavitKind) => {
   const raw = JSON.parse(response.message.content);
   const parsed = CustomElementArraySchema.parse(raw);
 
-  const narrative = parsed.map((node) => {
-    const children = Array.isArray(node.children) ? node.children : [];
-    const normalizedChildren = children.map((child, index) => {
-      if (typeof child?.text !== "string") return { text: "" };
-      const text =
-        index === 0
-          ? child.text.replace(LEADING_LIST_MARKER_RE, "").trimStart()
-          : child.text;
-      return { ...child, text };
-    });
-
-    return {
-      type: "paragraph",
-      align: "justify",
-      children: normalizedChildren.length > 0 ? normalizedChildren : [{ text: "" }],
-    };
-  });
+  const narrative = normalizeNarrativeOutput(parsed, { details, affiant, station });
 
   return { response, narrative };
 };
@@ -410,14 +525,6 @@ const handleGenerateAffidavit = async (req, res, affidavitKind) => {
     const config = AFFIDAVIT_CONFIG[affidavitKind];
     if (!config) {
       return res.status(400).json({ error: "Invalid affidavit type." });
-    }
-
-    let template;
-    try {
-      template = getTemplate();
-    } catch (err) {
-      console.error("Error reading template:", err);
-      return res.status(500).json({ error: "Template file not found" });
     }
 
     const details = req.body.caseDetails ? req.body.caseDetails : dummyDetails;
@@ -432,7 +539,7 @@ const handleGenerateAffidavit = async (req, res, affidavitKind) => {
     }
 
     const descriptor = config.descriptor(affiant, details);
-    const { response, narrative } = await generateNarrative(details, template, affidavitKind);
+    const { response, narrative } = await generateNarrative(details, affidavitKind, { affiant, station });
     const affidavitNodes = buildAffidavitDocument({
       subtitle: config.subtitle,
       affiant,
@@ -550,7 +657,8 @@ app.post("/api/ask", async (req, res) => {
     ].join("\n");
 
     const response = await ollama.chat({
-      model: "gemma3:latest",
+      model: ASK_MODEL,
+      keep_alive: OLLAMA_KEEP_ALIVE,
       messages: [
         { role: "system", content: buildGovFiscalSystemPrompt() },
         { role: "user", content: `CONTEXT:\n${combinedContext}\n\nQUESTION:\n${question}` },
@@ -568,9 +676,56 @@ app.post("/api/ask", async (req, res) => {
   }
 });
 
+const runStartupWarmup = async () => {
+  const startedAt = Date.now();
+  console.log("[warmup] Starting backend warmup...");
+
+  try {
+    const ragStart = Date.now();
+    await warmRagIndex();
+    console.log(`[warmup] RAG index ready in ${Date.now() - ragStart}ms.`);
+  } catch (err) {
+    console.warn("[warmup] RAG warmup failed:", err?.message ?? err);
+  }
+
+  try {
+    const modelStart = Date.now();
+    await ollama.chat({
+      model: GENERATION_MODEL,
+      keep_alive: OLLAMA_KEEP_ALIVE,
+      messages: [{ role: "user", content: "Reply with OK." }],
+      options: { num_predict: 1, temperature: 0 },
+    });
+    console.log(`[warmup] Generation model ready in ${Date.now() - modelStart}ms.`);
+  } catch (err) {
+    console.warn("[warmup] Generation model warmup failed:", err?.message ?? err);
+  }
+
+  if (ASK_MODEL !== GENERATION_MODEL) {
+    try {
+      const askModelStart = Date.now();
+      await ollama.chat({
+        model: ASK_MODEL,
+        keep_alive: OLLAMA_KEEP_ALIVE,
+        messages: [{ role: "user", content: "Reply with OK." }],
+        options: { num_predict: 1, temperature: 0 },
+      });
+      console.log(`[warmup] Ask model ready in ${Date.now() - askModelStart}ms.`);
+    } catch (err) {
+      console.warn("[warmup] Ask model warmup failed:", err?.message ?? err);
+    }
+  }
+
+  console.log(`[warmup] Finished in ${Date.now() - startedAt}ms.`);
+};
+
 app.listen(PORT, (error) => {
-	if (!error)
+	if (!error) {
 		console.log("Server is running. App is listening at port " + PORT);
-	else
+    if (ENABLE_STARTUP_WARMUP) {
+      void runStartupWarmup();
+    }
+  } else {
 		console.log("Error occurred, server can't start");
+  }
 });
