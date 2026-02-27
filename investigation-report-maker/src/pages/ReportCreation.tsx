@@ -177,6 +177,60 @@ const validateCaseDetailsForAffidavit = (
   return Array.from(new Set(missing));
 };
 
+const normalizeUiText = (value: string): string =>
+  value
+    .replace(/\s+/g, " ")
+    .replace(/\*$/g, "")
+    .trim()
+    .toLowerCase();
+
+const mapMissingFieldToUiLabels = (missingField: string): string[] => {
+  const normalized = normalizeUiText(missingField);
+
+  if (normalized.startsWith("witness ")) {
+    if (normalized.endsWith("full name")) return ["Full Name"];
+    if (normalized.endsWith("address")) return ["Address"];
+    if (normalized.endsWith("location during incident")) return ["Location During Incident"];
+    if (normalized.endsWith("observation narrative")) return ["Observation Narrative"];
+  }
+
+  if (normalized.startsWith("incident location ")) {
+    if (normalized.endsWith("barangay")) return ["Barangay"];
+    if (normalized.endsWith("city/municipality")) return ["City / Municipality"];
+    if (normalized.endsWith("province")) return ["Province"];
+  }
+
+  if (normalized.startsWith("assigned officer ")) return ["Officer in-charge"];
+  if (normalized.startsWith("poseur buyer ")) return ["Officer in-charge"];
+
+  switch (normalized) {
+    case "case number":
+      return ["Case Number"];
+    case "case title":
+      return ["Case Title"];
+    case "incident date (yyyy-mm-dd)":
+      return ["Incident Date (YYYY-MM-DD)"];
+    case "incident time (hh:mm 24-hour)":
+      return ["Incident Time (HH:MM)"];
+    case "incident type":
+      return ["Incident Type"];
+    case "investigating unit":
+      return ["Investigating Unit"];
+    case "complainant full name":
+      return ["Full Name"];
+    case "complainant address":
+      return ["Address"];
+    case "evidence summary":
+      return ["Evidence Summary"];
+    case "incident summary":
+      return ["Incident Summary"];
+    case "full narrative":
+      return ["Full Narrative"];
+    default:
+      return [];
+  }
+};
+
 const ReportCreation: React.FC = () => {
   const [title, setTitle] = React.useState<string>("Untitled Report");
   const [view, setView] = React.useState<ReportView>("details");
@@ -194,6 +248,127 @@ const ReportCreation: React.FC = () => {
   const { policeStation } = usePoliceOfficer();
 
   const [modeDialogOpen, setModeDialogOpen] = React.useState<boolean>(false);
+  const [missingFields, setMissingFields] = React.useState<string[]>([]);
+  const [unmappedMissingFields, setUnmappedMissingFields] = React.useState<string[]>([]);
+  const [activeValidationKind, setActiveValidationKind] = React.useState<AffidavitKind | null>(null);
+  const detailsValidationRootRef = React.useRef<HTMLDivElement | null>(null);
+
+  const getStationPayload = React.useCallback(
+    (): PoliceStation =>
+      policeStation && typeof policeStation.address === "object" && policeStation.address
+        ? policeStation
+        : caseDetails.policeStation,
+    [caseDetails.policeStation, policeStation],
+  );
+
+  const clearValidationHighlights = React.useCallback(() => {
+    const root = detailsValidationRootRef.current;
+    if (!root) return;
+
+    root.querySelectorAll(".missing-required-field").forEach((element) => {
+      element.classList.remove("missing-required-field");
+    });
+    root.querySelectorAll(".missing-required-action").forEach((element) => {
+      element.classList.remove("missing-required-action");
+    });
+  }, []);
+
+  const applyValidationHighlights = React.useCallback(
+    (fields: string[]) => {
+      const root = detailsValidationRootRef.current;
+      if (!root) return;
+
+      clearValidationHighlights();
+
+      if (fields.length === 0) {
+        setUnmappedMissingFields([]);
+        return;
+      }
+
+      const formControls = Array.from(root.querySelectorAll<HTMLElement>(".MuiFormControl-root"));
+      const actionButtons = Array.from(root.querySelectorAll<HTMLElement>("button"));
+      const unresolved: string[] = [];
+
+      const markControlsByLabel = (targetLabel: string): number => {
+        const normalizedLabel = normalizeUiText(targetLabel);
+        let matches = 0;
+
+        formControls.forEach((control) => {
+          const labelElement = control.querySelector<HTMLElement>("label");
+          if (!labelElement) return;
+
+          if (normalizeUiText(labelElement.textContent ?? "") === normalizedLabel) {
+            control.classList.add("missing-required-field");
+            matches += 1;
+          }
+        });
+
+        return matches;
+      };
+
+      const markActionButton = (targetLabel: string): boolean => {
+        const normalizedLabel = normalizeUiText(targetLabel);
+        let found = false;
+
+        actionButtons.forEach((button) => {
+          if (normalizeUiText(button.textContent ?? "") === normalizedLabel) {
+            button.classList.add("missing-required-action");
+            found = true;
+          }
+        });
+
+        return found;
+      };
+
+      fields.forEach((field) => {
+        let matched = false;
+
+        mapMissingFieldToUiLabels(field).forEach((label) => {
+          if (markControlsByLabel(label) > 0) {
+            matched = true;
+          }
+        });
+
+        const normalizedField = normalizeUiText(field);
+        if (!matched && normalizedField === "at least one witness") {
+          matched = markActionButton("Add Witness");
+        }
+        if (!matched && normalizedField === "poseur buyer details") {
+          matched = markActionButton("Add Poseur Buyer");
+        }
+
+        if (!matched) {
+          unresolved.push(field);
+        }
+      });
+
+      setUnmappedMissingFields(Array.from(new Set(unresolved)));
+    },
+    [clearValidationHighlights],
+  );
+
+  React.useEffect(() => {
+    if (!activeValidationKind) return;
+    const missing = validateCaseDetailsForAffidavit(
+      caseDetails,
+      getStationPayload(),
+      activeValidationKind,
+    );
+    setMissingFields(missing);
+
+    if (missing.length === 0) {
+      setUnmappedMissingFields([]);
+      setActiveValidationKind(null);
+    }
+  }, [activeValidationKind, caseDetails, getStationPayload]);
+
+  React.useEffect(() => {
+    if (view !== "details") {
+      clearValidationHighlights();
+      return;
+    }
+    applyValidationHighlights(missingFields);
+  }, [applyValidationHighlights, clearValidationHighlights, missingFields, view]);
 
   const handleOpenGenerateDialog = React.useCallback(() => {
     setModeDialogOpen(true);
@@ -223,22 +398,21 @@ const ReportCreation: React.FC = () => {
   const handleGenerateByKind = React.useCallback(async (kind: AffidavitKind) => {
     if (isGeneratingRef.current) return;
 
-    const stationPayload =
-      policeStation && typeof policeStation.address === "object" && policeStation.address
-        ? policeStation
-        : caseDetails.policeStation;
+    const stationPayload = getStationPayload();
 
     const missing = validateCaseDetailsForAffidavit(caseDetails, stationPayload, kind);
     if (missing.length > 0) {
+      setMissingFields(missing);
+      setActiveValidationKind(kind);
       setModeDialogOpen(false);
       setView("details");
-      alert(
-        `Please fill out these required fields first:\n\n${missing
-          .map((field) => `- ${field}`)
-          .join("\n")}`,
-      );
       return;
     }
+
+    setActiveValidationKind(null);
+    setMissingFields([]);
+    setUnmappedMissingFields([]);
+    clearValidationHighlights();
 
     isGeneratingRef.current = true;
     setModeDialogOpen(false);
@@ -294,7 +468,7 @@ const ReportCreation: React.FC = () => {
       isGeneratingRef.current = false;
       setIsFetching(false);
     }
-  }, [caseDetails, policeStation, resultEditor, setIsFetching, setSlateValue, title]);
+  }, [caseDetails, clearValidationHighlights, getStationPayload, resultEditor, setIsFetching, setSlateValue, title]);
 
   const handleLoadError = React.useCallback((message: string) => {
     alert(`Template import failed: ${message}`);
@@ -405,7 +579,39 @@ const ReportCreation: React.FC = () => {
             onLoadError={handleLoadError}
             onGenerateReport={handleOpenGenerateDialog}
             resultContent={<EditorComponent editor={resultEditor} />}
-            detailsContent={<CaseDetailsForm />}
+            detailsContent={
+              <Stack
+                ref={detailsValidationRootRef}
+                spacing={1.5}
+                sx={{
+                  "& .missing-required-field .MuiOutlinedInput-notchedOutline": {
+                    borderColor: "error.main !important",
+                    borderWidth: 2,
+                  },
+                  "& .missing-required-field .MuiInputLabel-root": {
+                    color: "error.main !important",
+                  },
+                  "& .missing-required-action": {
+                    borderColor: "error.main",
+                    color: "error.main",
+                  },
+                }}
+              >
+                {unmappedMissingFields.length > 0 && (
+                  <Stack spacing={0.25} sx={{ px: 0.5 }}>
+                    <Typography color="error" variant="body2">
+                      Fill in these required fields before generating:
+                    </Typography>
+                    {unmappedMissingFields.map((field) => (
+                      <Typography key={field} color="error" variant="caption">
+                        - {field}
+                      </Typography>
+                    ))}
+                  </Stack>
+                )}
+                <CaseDetailsForm />
+              </Stack>
+            }
             moreOptions={
               <>
                 <input
