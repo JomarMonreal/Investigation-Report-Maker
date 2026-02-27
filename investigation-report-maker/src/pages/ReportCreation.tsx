@@ -14,6 +14,8 @@ import EditorComponent from "../components/Editor/EditorComponent";
 import DocScaffoldLoad, { type ReportView } from "../components/DocScaffoldLoad";
 import { systemPrompt } from "../utils/dummy";
 import {
+  Alert,
+  AlertTitle,
   Menu,
   MenuItem,
   IconButton,
@@ -26,6 +28,7 @@ import {
   Stack,
 } from "@mui/material";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
+import { useNavigate } from "react-router-dom";
 import CaseDetailsForm from "../components/CaseDetailsForm";
 import { useCaseDetails } from "../hooks/useCaseDetails";
 import { usePoliceOfficer } from "../hooks/usePoliceOfficer";
@@ -231,7 +234,24 @@ const mapMissingFieldToUiLabels = (missingField: string): string[] => {
   }
 };
 
+const formatAffidavitKind = (kind: AffidavitKind): string => {
+  switch (kind) {
+    case "poseur-buyer":
+      return "poseur buyer";
+    case "complainant":
+      return "complainant";
+    case "witness":
+      return "witness";
+    default:
+      return "selected";
+  }
+};
+
+const isPoliceStationMissingField = (field: string): boolean =>
+  normalizeUiText(field).startsWith("police station");
+
 const ReportCreation: React.FC = () => {
+  const navigate = useNavigate();
   const [title, setTitle] = React.useState<string>("Untitled Report");
   const [view, setView] = React.useState<ReportView>("details");
 
@@ -252,6 +272,12 @@ const ReportCreation: React.FC = () => {
   const [unmappedMissingFields, setUnmappedMissingFields] = React.useState<string[]>([]);
   const [activeValidationKind, setActiveValidationKind] = React.useState<AffidavitKind | null>(null);
   const detailsValidationRootRef = React.useRef<HTMLDivElement | null>(null);
+  const visibleMissingFields = React.useMemo(() => missingFields.slice(0, 10), [missingFields]);
+  const hasMoreMissingFields = missingFields.length > visibleMissingFields.length;
+  const hasPoliceStationMissingFields = React.useMemo(
+    () => missingFields.some((field) => isPoliceStationMissingField(field)),
+    [missingFields],
+  );
 
   const getStationPayload = React.useCallback(
     (): PoliceStation =>
@@ -406,6 +432,9 @@ const ReportCreation: React.FC = () => {
       setActiveValidationKind(kind);
       setModeDialogOpen(false);
       setView("details");
+      requestAnimationFrame(() => {
+        detailsValidationRootRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
       return;
     }
 
@@ -600,7 +629,7 @@ const ReportCreation: React.FC = () => {
                 {unmappedMissingFields.length > 0 && (
                   <Stack spacing={0.25} sx={{ px: 0.5 }}>
                     <Typography color="error" variant="body2">
-                      Fill in these required fields before generating:
+                      Some missing fields could not be auto-highlighted:
                     </Typography>
                     {unmappedMissingFields.map((field) => (
                       <Typography key={field} color="error" variant="caption">
@@ -608,6 +637,42 @@ const ReportCreation: React.FC = () => {
                       </Typography>
                     ))}
                   </Stack>
+                )}
+                {missingFields.length > 0 && (
+                  <Alert
+                    severity="error"
+                    variant="outlined"
+                    sx={{ alignItems: "flex-start" }}
+                    action={
+                      hasPoliceStationMissingFields ? (
+                        <Button
+                          color="error"
+                          size="small"
+                          onClick={() => navigate("/police-station-management")}
+                        >
+                          Open Police Station
+                        </Button>
+                      ) : undefined
+                    }
+                  >
+                    <AlertTitle>
+                      Cannot generate affidavit of{" "}
+                      {formatAffidavitKind(activeValidationKind ?? "complainant")}
+                    </AlertTitle>
+                    <Typography variant="body2">
+                      Complete the required fields below, then try generating again.
+                    </Typography>
+                    {visibleMissingFields.map((field) => (
+                      <Typography key={field} variant="caption" component="div">
+                        - {field}
+                      </Typography>
+                    ))}
+                    {hasMoreMissingFields && (
+                      <Typography variant="caption" component="div">
+                        - ...and {missingFields.length - visibleMissingFields.length} more fields
+                      </Typography>
+                    )}
+                  </Alert>
                 )}
                 <CaseDetailsForm />
               </Stack>
