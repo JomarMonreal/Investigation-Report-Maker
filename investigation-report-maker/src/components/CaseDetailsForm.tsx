@@ -278,6 +278,7 @@ const CaseDetailsForm: React.FC = () => {
             <TextField
               className={css.field}
               label="Case Number"
+              required
               value={caseDetails.caseNumber}
               onChange={(event) =>
                 handleCaseFieldChange('caseNumber', event.target.value)
@@ -289,6 +290,7 @@ const CaseDetailsForm: React.FC = () => {
             <TextField
               className={css.field}
               label="Case Title"
+              required
               value={caseDetails.caseTitle}
               onChange={(event) =>
                 handleCaseFieldChange('caseTitle', event.target.value)
@@ -301,6 +303,7 @@ const CaseDetailsForm: React.FC = () => {
               <TextField
                 className={css.field}
                 label="Incident Date (YYYY-MM-DD)"
+                required
                 value={caseDetails.incidentDate}
                 onChange={(event) =>
                   handleCaseFieldChange('incidentDate', event.target.value as IsoDate)
@@ -311,6 +314,7 @@ const CaseDetailsForm: React.FC = () => {
               <TextField
                 className={css.field}
                 label="Incident Time (HH:MM)"
+                required
                 value={caseDetails.incidentTime}
                 onChange={(event) =>
                   handleCaseFieldChange('incidentTime', event.target.value as Time24h)
@@ -323,6 +327,7 @@ const CaseDetailsForm: React.FC = () => {
             <TextField
               className={css.field}
               label="Incident Type"
+              required
               value={caseDetails.incidentType}
               onChange={(event) =>
                 handleCaseFieldChange('incidentType', event.target.value)
@@ -334,6 +339,7 @@ const CaseDetailsForm: React.FC = () => {
             <TextField
               className={css.field}
               label="Investigating Unit"
+              required
               value={caseDetails.investigatingUnit}
               onChange={(event) =>
                 handleCaseFieldChange('investigatingUnit', event.target.value)
@@ -542,6 +548,7 @@ const CaseDetailsForm: React.FC = () => {
           <TextField
             className={css.field}
             label="Evidence Summary"
+            required
             value={caseDetails.evidenceSummary}
             onChange={(event) =>
               handleCaseFieldChange('evidenceSummary', event.target.value)
@@ -560,6 +567,7 @@ const CaseDetailsForm: React.FC = () => {
             <TextField
               className={css.field}
               label="Incident Summary"
+              required
               value={caseDetails.incidentSummary}
               onChange={(event) =>
                 handleCaseFieldChange('incidentSummary', event.target.value)
@@ -572,6 +580,7 @@ const CaseDetailsForm: React.FC = () => {
             <TextField
               className={css.field}
               label="Full Narrative"
+              required
               value={caseDetails.narrative}
               onChange={(event) =>
                 handleCaseFieldChange('narrative', event.target.value)

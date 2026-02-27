@@ -36,7 +36,7 @@ const OfficerForm: React.FC<OfficerFormProps> = ({ officer, onChange }) => {
           }
         }}
         renderInput={(params) => (
-          <TextField {...params} label="Officer in-charge" fullWidth />
+          <TextField {...params} label="Officer in-charge" fullWidth required />
         )}
       />
     </Stack>

@@ -2,7 +2,24 @@ import React, { useState } from "react";
 import CaseDetailsContext, { type CaseDetailsContextProps }  from "./CaseDetailsContext";
 import type { CaseDetails, IsoDate, Time24h } from "../types/CaseDatails";
 
+const getCurrentReportDateTime = (): { reportDate: IsoDate; reportTime: Time24h } => {
+  const now = new Date();
+  const reportDate = [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, "0"),
+    String(now.getDate()).padStart(2, "0"),
+  ].join("-") as IsoDate;
+  const reportTime = [
+    String(now.getHours()).padStart(2, "0"),
+    String(now.getMinutes()).padStart(2, "0"),
+  ].join(":") as Time24h;
+
+  return { reportDate, reportTime };
+};
+
 export const CaseDetailsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { reportDate, reportTime } = getCurrentReportDateTime();
+
   const [slateValue, setSlateValue] = useState<CaseDetailsContextProps["slateValue"]>([
     {
       children: [{ text: "" }],
@@ -13,8 +30,8 @@ export const CaseDetailsProvider: React.FC<{ children: React.ReactNode }> = ({ c
     caseTitle: "",
     incidentDate: "" as IsoDate,
     incidentTime: "" as Time24h,
-    reportDate: "" as IsoDate,
-    reportTime: "" as Time24h,
+    reportDate,
+    reportTime,
     incidentType: "",
     incidentLocation: {
       barangay: "",

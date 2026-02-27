@@ -2,6 +2,14 @@ import * as React from "react";
 import { Slate, withReact } from "slate-react";
 import { createEditor, Editor, Transforms, type Descendant } from "slate";
 import type { CustomElement } from "../utils/slateHelpers";
+import type {
+  CaseDetails,
+  Officer,
+  PhilippineAddress,
+  PoliceStation,
+  PoseurBuyer,
+  Witness,
+} from "../types/CaseDatails";
 import EditorComponent from "../components/Editor/EditorComponent";
 import DocScaffoldLoad, { type ReportView } from "../components/DocScaffoldLoad";
 import { systemPrompt } from "../utils/dummy";
@@ -21,8 +29,6 @@ import MoreVertIcon from "@mui/icons-material/MoreVert";
 import CaseDetailsForm from "../components/CaseDetailsForm";
 import { useCaseDetails } from "../hooks/useCaseDetails";
 import { usePoliceOfficer } from "../hooks/usePoliceOfficer";
-
-// ✅ Add these imports
 import { MessagingProvider } from "../context/MessagingProvider";
 import { VirtualFiscalDrawer } from "../components/VirtualFiscalDrawer";
 
@@ -58,14 +64,125 @@ const AFFIDAVIT_ENDPOINT: Record<AffidavitKind, string> = {
   witness: "/api/generate/witness",
 };
 
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const TIME_24H_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
+const hasText = (value: unknown): value is string =>
+  typeof value === "string" && value.trim().length > 0;
+
+const addRequiredText = (missing: string[], label: string, value: unknown): void => {
+  if (!hasText(value)) {
+    missing.push(label);
+  }
+};
+
+const addRequiredDate = (missing: string[], label: string, value: unknown): void => {
+  if (!hasText(value) || !ISO_DATE_RE.test(value.trim())) {
+    missing.push(`${label} (YYYY-MM-DD)`);
+  }
+};
+
+const addRequiredTime = (missing: string[], label: string, value: unknown): void => {
+  if (!hasText(value) || !TIME_24H_RE.test(value.trim())) {
+    missing.push(`${label} (HH:MM 24-hour)`);
+  }
+};
+
+const validateAddress = (
+  missing: string[],
+  address: PhilippineAddress | undefined,
+  labelPrefix: string,
+): void => {
+  addRequiredText(missing, `${labelPrefix} barangay`, address?.barangay);
+  addRequiredText(missing, `${labelPrefix} city/municipality`, address?.cityOrMunicipality);
+  addRequiredText(missing, `${labelPrefix} province`, address?.province);
+};
+
+const validateOfficer = (
+  missing: string[],
+  officer: Officer | PoseurBuyer | undefined,
+  labelPrefix: string,
+): void => {
+  addRequiredText(missing, `${labelPrefix} full name`, officer?.fullName);
+  addRequiredText(missing, `${labelPrefix} address`, officer?.address);
+  addRequiredText(missing, `${labelPrefix} rank/position`, officer?.rankOrPosition);
+  addRequiredText(missing, `${labelPrefix} unit/station`, officer?.unitOrStation);
+  addRequiredText(missing, `${labelPrefix} badge number`, officer?.badgeNumber);
+};
+
+const validateWitness = (
+  missing: string[],
+  witness: Witness,
+  witnessNumber: number,
+): void => {
+  const prefix = `Witness ${witnessNumber}`;
+  addRequiredText(missing, `${prefix} full name`, witness.fullName);
+  addRequiredText(missing, `${prefix} address`, witness.address);
+  addRequiredText(missing, `${prefix} location during incident`, witness.locationDuringIncident);
+  addRequiredText(missing, `${prefix} observation narrative`, witness.observationNarrative);
+};
+
+const validatePoliceStation = (
+  missing: string[],
+  station: PoliceStation | undefined,
+): void => {
+  addRequiredText(missing, "Police station name", station?.name);
+  validateAddress(missing, station?.address, "Police station address");
+};
+
+const validateCaseDetailsForAffidavit = (
+  details: CaseDetails,
+  station: PoliceStation,
+  kind: AffidavitKind,
+): string[] => {
+  const missing: string[] = [];
+
+  addRequiredText(missing, "Case number", details.caseNumber);
+  addRequiredText(missing, "Case title", details.caseTitle);
+  addRequiredDate(missing, "Incident date", details.incidentDate);
+  addRequiredTime(missing, "Incident time", details.incidentTime);
+  addRequiredText(missing, "Incident type", details.incidentType);
+  addRequiredText(missing, "Investigating unit", details.investigatingUnit);
+  validateAddress(missing, details.incidentLocation, "Incident location");
+
+  validateOfficer(missing, details.assignedOfficer, "Assigned officer");
+
+  addRequiredText(missing, "Complainant full name", details.complainant?.fullName);
+  addRequiredText(missing, "Complainant address", details.complainant?.address);
+
+  addRequiredText(missing, "Evidence summary", details.evidenceSummary);
+  addRequiredText(missing, "Incident summary", details.incidentSummary);
+  addRequiredText(missing, "Full narrative", details.narrative);
+
+  validatePoliceStation(missing, station);
+
+  if (kind === "witness") {
+    if (!Array.isArray(details.witnesses) || details.witnesses.length === 0) {
+      missing.push("At least one witness");
+    } else {
+      details.witnesses.forEach((witness, index) => {
+        validateWitness(missing, witness, index + 1);
+      });
+    }
+  }
+
+  if (kind === "poseur-buyer") {
+    if (!details.poseurBuyer) {
+      missing.push("Poseur buyer details");
+    } else {
+      validateOfficer(missing, details.poseurBuyer, "Poseur buyer");
+    }
+  }
+
+  return Array.from(new Set(missing));
+};
+
 const ReportCreation: React.FC = () => {
   const [title, setTitle] = React.useState<string>("Untitled Report");
   const [view, setView] = React.useState<ReportView>("details");
 
-  // ✅ Drawer state
   const [fiscalOpen, setFiscalOpen] = React.useState<boolean>(false);
 
-  // Slate
   const [resultEditor] = React.useState(() => withReact(createEditor()));
   const initialResultValue = React.useMemo<CustomElement[]>(() => [
     { type: "paragraph", children: [{ text: "Start typing or load a template..." }] },
@@ -76,9 +193,6 @@ const ReportCreation: React.FC = () => {
   const { caseDetails, setCaseDetails, setIsFetching, setSlateValue, isFetching } = useCaseDetails();
   const { policeStation } = usePoliceOfficer();
 
-  // -------------------------------------------------------------------------
-  // Generate modal state
-  // -------------------------------------------------------------------------
   const [modeDialogOpen, setModeDialogOpen] = React.useState<boolean>(false);
 
   const handleOpenGenerateDialog = React.useCallback(() => {
@@ -89,9 +203,6 @@ const ReportCreation: React.FC = () => {
     setModeDialogOpen(false);
   }, []);
 
-  // -------------------------------------------------------------------------
-  // Template management (stubbed for now)
-  // -------------------------------------------------------------------------
   const handleLoadTemplate = React.useCallback(() => {
     // store only
   }, []);
@@ -111,14 +222,29 @@ const ReportCreation: React.FC = () => {
 
   const handleGenerateByKind = React.useCallback(async (kind: AffidavitKind) => {
     if (isGeneratingRef.current) return;
+
+    const stationPayload =
+      policeStation && typeof policeStation.address === "object" && policeStation.address
+        ? policeStation
+        : caseDetails.policeStation;
+
+    const missing = validateCaseDetailsForAffidavit(caseDetails, stationPayload, kind);
+    if (missing.length > 0) {
+      setModeDialogOpen(false);
+      setView("details");
+      alert(
+        `Please fill out these required fields first:\n\n${missing
+          .map((field) => `- ${field}`)
+          .join("\n")}`,
+      );
+      return;
+    }
+
     isGeneratingRef.current = true;
     setModeDialogOpen(false);
+
     try {
       setIsFetching(true);
-      const stationPayload =
-        policeStation && typeof policeStation.address === "object" && policeStation.address
-          ? policeStation
-          : caseDetails.policeStation;
 
       const httpResponse = await fetch(AFFIDAVIT_ENDPOINT[kind], {
         method: "POST",
@@ -168,18 +294,12 @@ const ReportCreation: React.FC = () => {
       isGeneratingRef.current = false;
       setIsFetching(false);
     }
-  }, [setIsFetching, caseDetails, policeStation, resultEditor, title, setSlateValue]);
+  }, [caseDetails, policeStation, resultEditor, setIsFetching, setSlateValue, title]);
 
-  // -------------------------------------------------------------------------
-  // Template load error
-  // -------------------------------------------------------------------------
   const handleLoadError = React.useCallback((message: string) => {
     alert(`Template import failed: ${message}`);
   }, []);
 
-  // -------------------------------------------------------------------------
-  // Menu (save/load details)
-  // -------------------------------------------------------------------------
   const [menuAnchor, setMenuAnchor] = React.useState<null | HTMLElement>(null);
 
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
@@ -228,12 +348,10 @@ const ReportCreation: React.FC = () => {
   };
 
   return (
-    <MessagingProvider >
+    <MessagingProvider>
       <>
-        {/* ✅ Virtual Fiscal Drawer */}
         <VirtualFiscalDrawer open={fiscalOpen} onClose={() => setFiscalOpen(false)} />
 
-        {/* Generate mode selection dialog */}
         <Dialog open={modeDialogOpen} onClose={handleCloseGenerateDialog} fullWidth maxWidth="sm">
           <DialogTitle>Generate Affidavit</DialogTitle>
           <DialogContent dividers>
@@ -272,7 +390,6 @@ const ReportCreation: React.FC = () => {
           </DialogActions>
         </Dialog>
 
-        {/* Main layout */}
         <Slate
           editor={resultEditor}
           initialValue={initialResultValue}
@@ -299,7 +416,6 @@ const ReportCreation: React.FC = () => {
                   onChange={handleLoadCaseDetails}
                 />
 
-                {/* ✅ Open Virtual Fiscal */}
                 <Button
                   variant="outlined"
                   size="small"
