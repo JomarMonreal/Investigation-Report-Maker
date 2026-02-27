@@ -109,4 +109,4 @@ const OfficerEventForm: React.FC<OfficerEventFormProps> = ({
     </Stack>
   );
 };
-export default OfficerEventForm;
+export default React.memo(OfficerEventForm);

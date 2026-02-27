@@ -18,7 +18,7 @@ import FormatListBulletedIcon from "@mui/icons-material/FormatListBulleted";
 import FormatListNumberedIcon from "@mui/icons-material/FormatListNumbered";
 import FormatUnderlinedIcon from "@mui/icons-material/FormatUnderlined";
 import { Editor, Element as SlateElement, Transforms, Text, Range } from "slate";
-import { ReactEditor, useSlate } from "slate-react";
+import { ReactEditor, useSlateStatic } from "slate-react";
 import { toggleFontSize, toggleMark } from "../../utils/slateHelpers";
 
 /** Text alignment values supported by our schema. */
@@ -57,7 +57,8 @@ const getCurrentFontSize = (editor: Editor): number | undefined => {
   // Expanded selection: scan text nodes and collapse to a single value if uniform
   const sizes = new Set<number>();
   for (const [n] of Editor.nodes(editor, { at: editor.selection, match: Text.isText })) {
-    const size = normalizeFontSize((n as any).fontSize);
+    const leaf = n as Text & { fontSize?: unknown };
+    const size = normalizeFontSize(leaf.fontSize);
     if (size !== undefined) sizes.add(size);
     else sizes.add(NaN); // represent "no size mark" explicitly
     if (sizes.size > 1) break;
@@ -113,11 +114,13 @@ const setAlignment = (editor: Editor, align: Align): void => {
 
 const getCurrentAlign = (editor: Editor): Align => {
   if (!editor.selection) return "left";
+  const hasAlign = (node: unknown): node is AlignableElement =>
+    SlateElement.isElement(node) && "align" in node;
   const withAlign =
     Editor.above(editor, {
       at: editor.selection,
       mode: "lowest",
-      match: (n) => SlateElement.isElement(n) && "align" in (n as any),
+      match: hasAlign,
     }) ??
     Editor.above(editor, {
       at: editor.selection,
@@ -159,7 +162,10 @@ const ensureLiShape = (editor: Editor): void => {
     const [first] = Editor.node(editor, path);
     if (
       SlateElement.isElement(first) &&
-      first.children.some((c) => SlateElement.isElement(c as any) && (c as SlateElement).type !== "paragraph")
+      first.children.some((c) => {
+        if (!SlateElement.isElement(c)) return false;
+        return (c as SlateElement).type !== "paragraph";
+      })
     ) {
       Transforms.wrapNodes(
         editor,
@@ -211,7 +217,7 @@ const toggleList = (editor: Editor, type: ListType): void => {
 };
 
 export const EditorToolbar: React.FC = React.memo(() => {
-  const editor = useSlate();
+  const editor = useSlateStatic();
 
   // Marks state
   const marks = React.useMemo<ReadonlyArray<Mark>>(() => {

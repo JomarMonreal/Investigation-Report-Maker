@@ -15,7 +15,7 @@ import {
   DialogActions,
   Button,
   Typography,
-  Box,
+  Stack,
 } from "@mui/material";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import CaseDetailsForm from "../components/CaseDetailsForm";
@@ -26,6 +26,38 @@ import { usePoliceOfficer } from "../hooks/usePoliceOfficer";
 import { MessagingProvider } from "../context/MessagingProvider";
 import { VirtualFiscalDrawer } from "../components/VirtualFiscalDrawer";
 
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
+
+type ErrorWithStatus = Error & { status?: number };
+
+const isServerUnavailable = (err: unknown): boolean => {
+  if (!(err instanceof Error)) return false;
+  const withStatus = err as ErrorWithStatus;
+  if (typeof withStatus.status === "number" && withStatus.status >= 500) {
+    return true;
+  }
+  const message = err.message.toLowerCase();
+  return (
+    message.includes("failed to fetch") ||
+    message.includes("fetch failed") ||
+    message.includes("networkerror") ||
+    message.includes("network request failed") ||
+    message.includes("load failed") ||
+    message.includes("request failed (502)") ||
+    message.includes("request failed (503)") ||
+    message.includes("request failed (504)")
+  );
+};
+
+type AffidavitKind = "poseur-buyer" | "complainant" | "witness";
+
+const AFFIDAVIT_ENDPOINT: Record<AffidavitKind, string> = {
+  "poseur-buyer": "/api/generate/poseur-buyer",
+  complainant: "/api/generate/complainant",
+  witness: "/api/generate/witness",
+};
+
 const ReportCreation: React.FC = () => {
   const [title, setTitle] = React.useState<string>("Untitled Report");
   const [view, setView] = React.useState<ReportView>("details");
@@ -35,11 +67,13 @@ const ReportCreation: React.FC = () => {
 
   // Slate
   const [resultEditor] = React.useState(() => withReact(createEditor()));
-  const [resultValue, setResultValue] = React.useState<CustomElement[]>([
+  const initialResultValue = React.useMemo<CustomElement[]>(() => [
     { type: "paragraph", children: [{ text: "Start typing or load a template..." }] },
-  ]);
+  ], []);
+  const latestResultValueRef = React.useRef<CustomElement[]>(initialResultValue);
+  const isGeneratingRef = React.useRef(false);
 
-  const { caseDetails, setCaseDetails, setIsFetching, setSlateValue } = useCaseDetails();
+  const { caseDetails, setCaseDetails, setIsFetching, setSlateValue, isFetching } = useCaseDetails();
   const { policeStation } = usePoliceOfficer();
 
   // -------------------------------------------------------------------------
@@ -66,21 +100,48 @@ const ReportCreation: React.FC = () => {
     // reset cache when chip x is clicked
   }, []);
 
-  // -------------------------------------------------------------------------
-  // AI mode: call your /api/generate endpoint
-  // -------------------------------------------------------------------------
-  const handleGenerateReportAIMode = React.useCallback(async () => {
+  const handleSlateChange = React.useCallback((value: Descendant[]) => {
+    latestResultValueRef.current = value as CustomElement[];
+  }, []);
+
+  const handleOpenFiscalDrawer = React.useCallback(() => {
+    setSlateValue(latestResultValueRef.current);
+    setFiscalOpen(true);
+  }, [setSlateValue]);
+
+  const handleGenerateByKind = React.useCallback(async (kind: AffidavitKind) => {
+    if (isGeneratingRef.current) return;
+    isGeneratingRef.current = true;
     setModeDialogOpen(false);
     try {
       setIsFetching(true);
-      const response = await fetch("/api/generate", {
+      const stationPayload =
+        policeStation && typeof policeStation.address === "object" && policeStation.address
+          ? policeStation
+          : caseDetails.policeStation;
+
+      const httpResponse = await fetch(AFFIDAVIT_ENDPOINT[kind], {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ caseDetails, policeStation, systemPrompt }),
-      }).then((res) => res.json());
+        body: JSON.stringify({ caseDetails, policeStation: stationPayload, systemPrompt }),
+      });
+      const response = await httpResponse.json().catch(() => null);
+      if (!httpResponse.ok) {
+        const message =
+          response && typeof response.message === "string"
+            ? response.message
+            : `Request failed (${httpResponse.status})`;
+        const error = new Error(message) as ErrorWithStatus;
+        error.status = httpResponse.status;
+        throw error;
+      }
+      if (!response || !response.message || typeof response.message.content !== "string") {
+        throw new Error("Invalid response from server.");
+      }
 
       const parsed = JSON.parse(response.message.content);
       const nodes = parsed as Descendant[];
+      latestResultValueRef.current = nodes as CustomElement[];
 
       Editor.withoutNormalizing(resultEditor, () => {
         Transforms.select(resultEditor, {
@@ -97,13 +158,17 @@ const ReportCreation: React.FC = () => {
       }
 
       setView("result");
-      setSlateValue(resultValue);
-      setIsFetching(false);
+      setSlateValue(nodes);
     } catch (err) {
-      alert(`Failed to generate report: ${err instanceof Error ? err.message : "Unknown error"}`);
+      if (isServerUnavailable(err)) {
+        await sleep(1000);
+      }
+      alert(`Failed to generate ${kind} affidavit: ${err instanceof Error ? err.message : "Unknown error"}`);
+    } finally {
+      isGeneratingRef.current = false;
       setIsFetching(false);
     }
-  }, [setIsFetching, caseDetails, policeStation, resultEditor, title, setSlateValue, resultValue]);
+  }, [setIsFetching, caseDetails, policeStation, resultEditor, title, setSlateValue]);
 
   // -------------------------------------------------------------------------
   // Template load error
@@ -170,30 +235,48 @@ const ReportCreation: React.FC = () => {
 
         {/* Generate mode selection dialog */}
         <Dialog open={modeDialogOpen} onClose={handleCloseGenerateDialog} fullWidth maxWidth="sm">
-          <DialogTitle>Generate Report</DialogTitle>
+          <DialogTitle>Generate Affidavit</DialogTitle>
           <DialogContent dividers>
-            <Box mb={3}>
-              <Typography variant="subtitle1" gutterBottom>
-                AI Mode
+            <Stack spacing={1.5}>
+              <Typography variant="subtitle1">
+                Select affidavit to generate
               </Typography>
-              <Typography variant="body2" paragraph>
-                Gumamit ng AI upang awtomatikong buuin ang buong ulat mula sa mga detalye ng kaso.
-              </Typography>
-              <Button variant="contained" fullWidth onClick={handleGenerateReportAIMode}>
-                Use AI Mode
+              <Button
+                variant="contained"
+                fullWidth
+                onClick={() => void handleGenerateByKind("complainant")}
+                disabled={isFetching}
+              >
+                Generate affidavit of complainant
               </Button>
-            </Box>
+              <Button
+                variant="contained"
+                fullWidth
+                onClick={() => void handleGenerateByKind("witness")}
+                disabled={isFetching}
+              >
+                Generate affidavit of witness
+              </Button>
+              <Button
+                variant="contained"
+                fullWidth
+                onClick={() => void handleGenerateByKind("poseur-buyer")}
+                disabled={isFetching}
+              >
+                Generate affidavit of poseur buyer
+              </Button>
+            </Stack>
           </DialogContent>
           <DialogActions>
-            <Button onClick={handleCloseGenerateDialog}>Close</Button>
+            <Button onClick={handleCloseGenerateDialog} disabled={isFetching}>Close</Button>
           </DialogActions>
         </Dialog>
 
         {/* Main layout */}
         <Slate
           editor={resultEditor}
-          initialValue={resultValue}
-          onChange={(value) => setResultValue(value as CustomElement[])}
+          initialValue={initialResultValue}
+          onChange={handleSlateChange}
         >
           <DocScaffoldLoad
             title={title}
@@ -220,7 +303,7 @@ const ReportCreation: React.FC = () => {
                 <Button
                   variant="outlined"
                   size="small"
-                  onClick={() => setFiscalOpen(true)}
+                  onClick={handleOpenFiscalDrawer}
                   sx={{ mr: 1 }}
                 >
                   Virtual Fiscal

@@ -48,188 +48,220 @@ const CaseDetailsForm: React.FC = () => {
   // Root-level field handlers
   // ---------------------------------------------------------------------------
 
-  const handleCaseFieldChange = <K extends keyof CaseDetails>(
-    field: K,
-    value: CaseDetails[K],
-  ): void => {
-    setCaseDetails({
-      ...caseDetails,
-      [field]: value,
-    });
-  };
+  const handleCaseFieldChange = React.useCallback(
+    <K extends keyof CaseDetails>(field: K, value: CaseDetails[K]): void => {
+      setCaseDetails((prev) => ({
+        ...prev,
+        [field]: value,
+      }));
+    },
+    [setCaseDetails]
+  );
 
-  const handlePriorityChange = (
+  const handlePriorityChange = React.useCallback((
     event: React.ChangeEvent<HTMLInputElement>,
   ): void => {
     handleCaseFieldChange('priority', event.target.value as CasePriority);
-  };
+  }, [handleCaseFieldChange]);
 
   // ---------------------------------------------------------------------------
   // Nested object handlers
   // ---------------------------------------------------------------------------
 
-  const handleArrestDetailsChange = (updated: ArrestDetails | undefined): void => {
+  const handleArrestDetailsChange = React.useCallback((updated: ArrestDetails | undefined): void => {
     handleCaseFieldChange('arrestDetails', updated);
-  };
+  }, [handleCaseFieldChange]);
 
-  const handleAssignedOfficerChange = (updated: Officer): void => {
-    console.log(updated);
+  const handleAssignedOfficerChange = React.useCallback((updated: Officer): void => {
     handleCaseFieldChange('assignedOfficer', updated);
-  };
+  }, [handleCaseFieldChange]);
 
-  const handleComplainantChange = (updated: Complainant): void => {
+  const handleComplainantChange = React.useCallback((updated: Complainant): void => {
     handleCaseFieldChange('complainant', updated);
-  };
+  }, [handleCaseFieldChange]);
 
-  const handlePoseurBuyerChange = (updated: PoseurBuyer | undefined): void => {
+  const handlePoseurBuyerChange = React.useCallback((updated: PoseurBuyer | undefined): void => {
     handleCaseFieldChange('poseurBuyer', updated);
-  };
+  }, [handleCaseFieldChange]);
 
-  const handlePreOperationDetailsChange = (
+  const handlePreOperationDetailsChange = React.useCallback((
     updated: PreOperationDetails | undefined,
   ): void => {
     handleCaseFieldChange('preOperationDetails', updated);
-  };
+  }, [handleCaseFieldChange]);
 
-  const handleAdministeringOfficerChange = (
+  const handleAdministeringOfficerChange = React.useCallback((
     updated: Officer | undefined,
   ): void => {
     handleCaseFieldChange('administeringOfficer', updated);
-  };
+  }, [handleCaseFieldChange]);
 
   // ---------------------------------------------------------------------------
   // Array handlers
   // ---------------------------------------------------------------------------
 
-  const handleArrestingOfficerChange = (index: number, updated: Officer): void => {
-    const next = caseDetails.arrestingOfficers.map((officer, idx) =>
-      idx === index ? updated : officer,
-    );
+  const handleArrestingOfficerChange = React.useCallback((index: number, updated: Officer): void => {
+    setCaseDetails((prev) => ({
+      ...prev,
+      arrestingOfficers: prev.arrestingOfficers.map((officer, idx) =>
+        idx === index ? updated : officer,
+      ),
+    }));
+  }, [setCaseDetails]);
 
-    handleCaseFieldChange('arrestingOfficers', next);
-  };
+  const handleArrestingOfficerAdd = React.useCallback((): void => {
+    setCaseDetails((prev) => ({
+      ...prev,
+      arrestingOfficers: [
+        ...prev.arrestingOfficers,
+        {
+          address: '',
+          fullName: '',
+          rankOrPosition: '',
+          unitOrStation: '',
+          badgeNumber: '',
+        },
+      ],
+    }));
+  }, [setCaseDetails]);
 
-  const handleArrestingOfficerAdd = (): void => {
-    const next: Officer[] = [
-      ...caseDetails.arrestingOfficers,
-      {
-        address: '',
-        fullName: '',
-        rankOrPosition: '',
-        unitOrStation: '',
-        badgeNumber: '',
-      },
-    ];
-    handleCaseFieldChange('arrestingOfficers', next);
-  };
+  const handleArrestingOfficerRemove = React.useCallback((index: number): void => {
+    setCaseDetails((prev) => ({
+      ...prev,
+      arrestingOfficers: prev.arrestingOfficers.filter((_, idx) => idx !== index),
+    }));
+  }, [setCaseDetails]);
 
-  const handleArrestingOfficerRemove = (index: number): void => {
-    const next = caseDetails.arrestingOfficers.filter((_, idx) => idx !== index);
-    handleCaseFieldChange('arrestingOfficers', next);
-  };
+  const handleEvidenceChange = React.useCallback((index: number, updated: EvidenceItem): void => {
+    setCaseDetails((prev) => ({
+      ...prev,
+      evidence: prev.evidence.map((item, idx) =>
+        idx === index ? updated : item,
+      ),
+    }));
+  }, [setCaseDetails]);
 
-  const handleEvidenceChange = (index: number, updated: EvidenceItem): void => {
-    const next = caseDetails.evidence.map((item, idx) =>
-      idx === index ? updated : item,
-    );
-    handleCaseFieldChange('evidence', next);
-  };
+  const handleEvidenceAdd = React.useCallback((): void => {
+    setCaseDetails((prev) => ({
+      ...prev,
+      evidence: [
+        ...prev.evidence,
+        {
+          chainOfCustody: [],
+          description: '',
+          firstCustodianName: '',
+          label: '',
+          recoveryLocation: '',
+          seizureDate: '' as IsoDate,
+          seizureTime: '' as Time24h,
+        },
+      ],
+    }));
+  }, [setCaseDetails]);
 
-  const handleEvidenceAdd = (): void => {
-    const next: EvidenceItem[] = [
-      ...caseDetails.evidence,
-      {
-        chainOfCustody: [],
-        description: '',
-        firstCustodianName: '',
-        label: '',
-        recoveryLocation: '',
-        seizureDate: '' as IsoDate,
-        seizureTime: '' as Time24h,
-      },
-    ];
-    handleCaseFieldChange('evidence', next);
-  };
+  const handleEvidenceRemove = React.useCallback((index: number): void => {
+    setCaseDetails((prev) => ({
+      ...prev,
+      evidence: prev.evidence.filter((_, idx) => idx !== index),
+    }));
+  }, [setCaseDetails]);
 
-  const handleEvidenceRemove = (index: number): void => {
-    const next = caseDetails.evidence.filter((_, idx) => idx !== index);
-    handleCaseFieldChange('evidence', next);
-  };
+  const handleOfficerEventChange = React.useCallback((index: number, updated: OfficerEvent): void => {
+    setCaseDetails((prev) => ({
+      ...prev,
+      officerEvents: prev.officerEvents.map((event, idx) =>
+        idx === index ? updated : event,
+      ),
+    }));
+  }, [setCaseDetails]);
 
-  const handleOfficerEventChange = (index: number, updated: OfficerEvent): void => {
-    const next = caseDetails.officerEvents.map((event, idx) =>
-      idx === index ? updated : event,
-    );
-    handleCaseFieldChange('officerEvents', next);
-  };
+  const handleOfficerEventAdd = React.useCallback((): void => {
+    setCaseDetails((prev) => ({
+      ...prev,
+      officerEvents: [
+        ...prev.officerEvents,
+        {
+          action: '',
+          date: '' as IsoDate,
+          location: '',
+          materialsUsed: '',
+          peopleInvolved: '',
+          time: '' as Time24h,
+        },
+      ],
+    }));
+  }, [setCaseDetails]);
 
-  const handleOfficerEventAdd = (): void => {
-    const next: OfficerEvent[] = [
-      ...caseDetails.officerEvents,
-      {
-        action: '',
-        date: '' as IsoDate,
-        location: '',
-        materialsUsed: '',
-        peopleInvolved: '',
-        time: '' as Time24h,
-      },
-    ];
-    handleCaseFieldChange('officerEvents', next);
-  };
+  const handleOfficerEventRemove = React.useCallback((index: number): void => {
+    setCaseDetails((prev) => ({
+      ...prev,
+      officerEvents: prev.officerEvents.filter((_, idx) => idx !== index),
+    }));
+  }, [setCaseDetails]);
 
-  const handleOfficerEventRemove = (index: number): void => {
-    const next = caseDetails.officerEvents.filter((_, idx) => idx !== index);
-    handleCaseFieldChange('officerEvents', next);
-  };
+  const handleSuspectChange = React.useCallback((index: number, updated: Suspect): void => {
+    setCaseDetails((prev) => ({
+      ...prev,
+      suspects: prev.suspects.map((suspect, idx) =>
+        idx === index ? updated : suspect,
+      ),
+    }));
+  }, [setCaseDetails]);
 
-  const handleSuspectChange = (index: number, updated: Suspect): void => {
-    const next = caseDetails.suspects.map((suspect, idx) =>
-      idx === index ? updated : suspect,
-    );
-    handleCaseFieldChange('suspects', next);
-  };
+  const handleSuspectAdd = React.useCallback((): void => {
+    setCaseDetails((prev) => ({
+      ...prev,
+      suspects: [
+        ...prev.suspects,
+        {
+          fullName: '',
+        },
+      ],
+    }));
+  }, [setCaseDetails]);
 
-  const handleSuspectAdd = (): void => {
-    const next: Suspect[] = [
-      ...caseDetails.suspects,
-      {
-        fullName: '',
-      },
-    ];
-    handleCaseFieldChange('suspects', next);
-  };
+  const handleSuspectRemove = React.useCallback((index: number): void => {
+    setCaseDetails((prev) => ({
+      ...prev,
+      suspects: prev.suspects.filter((_, idx) => idx !== index),
+    }));
+  }, [setCaseDetails]);
 
-  const handleSuspectRemove = (index: number): void => {
-    const next = caseDetails.suspects.filter((_, idx) => idx !== index);
-    handleCaseFieldChange('suspects', next);
-  };
+  const handleWitnessChange = React.useCallback((index: number, updated: Witness): void => {
+    setCaseDetails((prev) => ({
+      ...prev,
+      witnesses: prev.witnesses.map((witness, idx) =>
+        idx === index ? updated : witness,
+      ),
+    }));
+  }, [setCaseDetails]);
 
-  const handleWitnessChange = (index: number, updated: Witness): void => {
-    const next = caseDetails.witnesses.map((witness, idx) =>
-      idx === index ? updated : witness,
-    );
-    handleCaseFieldChange('witnesses', next);
-  };
+  const handleWitnessAdd = React.useCallback((): void => {
+    setCaseDetails((prev) => ({
+      ...prev,
+      witnesses: [
+        ...prev.witnesses,
+        {
+          address: '',
+          fullName: '',
+          locationDuringIncident: '',
+          observationNarrative: '',
+          witnessType: 'CivilianEyewitness',
+        },
+      ],
+    }));
+  }, [setCaseDetails]);
 
-  const handleWitnessAdd = (): void => {
-    const next: Witness[] = [
-      ...caseDetails.witnesses,
-      {
-        address: '',
-        fullName: '',
-        locationDuringIncident: '',
-        observationNarrative: '',
-        witnessType: 'CivilianEyewitness',
-      },
-    ];
-    handleCaseFieldChange('witnesses', next);
-  };
+  const handleWitnessRemove = React.useCallback((index: number): void => {
+    setCaseDetails((prev) => ({
+      ...prev,
+      witnesses: prev.witnesses.filter((_, idx) => idx !== index),
+    }));
+  }, [setCaseDetails]);
 
-  const handleWitnessRemove = (index: number): void => {
-    const next = caseDetails.witnesses.filter((_, idx) => idx !== index);
-    handleCaseFieldChange('witnesses', next);
-  };
+  const handleIncidentLocationChange = React.useCallback((updated: CaseDetails["incidentLocation"]): void => {
+    handleCaseFieldChange('incidentLocation', updated);
+  }, [handleCaseFieldChange]);
 
   // ---------------------------------------------------------------------------
   // Render
@@ -327,7 +359,7 @@ const CaseDetailsForm: React.FC = () => {
 
             <PhilippineAddressForm
               address={caseDetails.incidentLocation}
-              onChange={(updated) => handleCaseFieldChange('incidentLocation', updated)}
+              onChange={handleIncidentLocationChange}
             />  
           </Stack>
         </Box>

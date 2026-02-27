@@ -6,11 +6,23 @@ import { toggleFontSize, toggleMark } from '../../utils/slateHelpers';
 import type { BaseEditor } from 'slate';
 import { Element } from './Element';
 
+const editorStyles = {
+  padding: '10px',
+  backgroundColor: 'white',
+  color: 'black',
+  minHeight: '1000px'
+} as const;
 
-const EditorComponent = ({ editor }: {editor :BaseEditor & ReactEditor}) => {
+interface EditorComponentProps {
+  editor: BaseEditor & ReactEditor;
+}
+
+const EditorComponent: React.FC<EditorComponentProps> = ({ editor }) => {
+  const renderElement = React.useCallback((props: Parameters<typeof Element>[0]) => <Element {...props} />, []);
+  const renderLeaf = React.useCallback((props: Parameters<typeof Leaf>[0]) => <Leaf {...props} />, []);
 
   // Handle keydown events for formatting and font size changes
-  const onKeyDown = (event: React.KeyboardEvent) => {
+  const onKeyDown = React.useCallback((event: React.KeyboardEvent) => {
     // Check for key combinations (e.g., Ctrl + B for bold, Ctrl + Shift + < for font size down)
     if (event.ctrlKey && event.shiftKey) {
       if (event.key === ',' || event.key === '<') {
@@ -41,22 +53,20 @@ const EditorComponent = ({ editor }: {editor :BaseEditor & ReactEditor}) => {
       }
 
     }
-  };
+  }, [editor]);
 
 
   return (
       <Editable
-        renderElement={(props) => <Element {...props} />}
-        renderLeaf={(props) => <Leaf {...props} />}
-        style={{
-          padding: '10px',
-          backgroundColor: 'white',
-          color: 'black',
-          minHeight: '1000px'
-        }}
+        renderElement={renderElement}
+        renderLeaf={renderLeaf}
+        style={editorStyles}
         onKeyDown={onKeyDown}
+        spellCheck={false}
+        autoCorrect="off"
+        autoCapitalize="off"
       />
   );
 };
 
-export default EditorComponent;
+export default React.memo(EditorComponent);

@@ -2,6 +2,7 @@ const express = require('express');
 const {Ollama} = require('ollama');
 const z = require('zod');
 const fs = require('fs');
+const path = require('path');
 const { retrieveContext } = require("./rag");
 
 const CustomTextSchema = z.object({
@@ -32,15 +33,52 @@ const dummyDetails = {
 	victim: "Asher Hernandez",
 };
 
+const resolveAddressObject = (value) => {
+  if (!value || typeof value !== "object") return null;
+
+  if ("cityOrMunicipality" in value || "province" in value) {
+    return value;
+  }
+
+  if ("completeAddress" in value && value.completeAddress && typeof value.completeAddress === "object") {
+    return value.completeAddress;
+  }
+
+  if ("address" in value && value.address && typeof value.address === "object") {
+    return value.address;
+  }
+
+  return null;
+};
+
+const extractMunicipalityProvince = (value) => {
+  const location = resolveAddressObject(value);
+  if (!location) return { municipality: undefined, province: undefined };
+
+  const municipality =
+    location.cityOrMunicipality ??
+    location.cityMunicipality ??
+    location.municipality ??
+    location.city ??
+    location.town;
+
+  const province =
+    location.province ??
+    location.prov ??
+    location.state;
+
+  return { municipality, province };
+};
+
 const municipalityProvinceFormatter = (incidentLocation) => {
-  const muni = incidentLocation?.cityOrMunicipality;
-  const province = incidentLocation?.province;
+  const { municipality: muni, province } = extractMunicipalityProvince(incidentLocation);
   return `${safe(muni, "[MISSING MUNICIPALITY]")}, ${safe(province, "[MISSING PROVINCE]")}`;
 };
 
 
 const app = express();
 const PORT = 3000;
+const TEMPLATE_PATH = path.join(__dirname, 'templates', 'affidavit-of-poseur-buyer.json');
 
 app.use(express.json());
 
@@ -57,7 +95,14 @@ const fetchWithTimeout = (url, init = {}) => {
 
 const safe = (v, placeholder = "[MISSING]") => {
   if (v === null || v === undefined) return placeholder;
-  if (typeof v === "string" && v.trim() === "") return placeholder;
+  if (typeof v === "string") {
+    const trimmed = v.trim();
+    if (!trimmed) return placeholder;
+    if (trimmed.toLowerCase() === "undefined" || trimmed.toLowerCase() === "null") {
+      return placeholder;
+    }
+    return trimmed;
+  }
   return String(v);
 };
 
@@ -72,302 +117,332 @@ const safeDate = (v) => {
 const monthName = (d) =>
   d ? d.toLocaleString("en-US", { month: "long" }) : "[MISSING MONTH]";
 
+const formatAddressForReport = (value) => {
+  if (typeof value === "string") {
+    return safe(value, "[MISSING ADDRESS]");
+  }
+  if (value && typeof value === "object" && typeof value.address === "string") {
+    return safe(value.address, "[MISSING ADDRESS]");
+  }
 
+  const location = resolveAddressObject(value);
+  if (!location) {
+    return municipalityProvinceFormatter(value);
+  }
 
-app.post('/api/generate', async (req, res) => {
+  return municipalityProvinceFormatter(location);
+};
 
-	try {
-		let template = '';
-		
-		try {
-			const templateData = fs.readFileSync('templates/affidavit-of-poseur-buyer.json', 'utf8');
-			const parsedTemplate = JSON.parse(templateData);
+let cachedTemplate = null;
 
-			template = JSON.stringify(parsedTemplate, null, 2);
-		} catch (err) {
-			console.error('Error reading template:', err);
-			return res.status(500).json({ error: 'Template file not found' });
-		}
+const getTemplate = () => {
+  if (cachedTemplate) return cachedTemplate;
+  const templateData = fs.readFileSync(TEMPLATE_PATH, 'utf8');
+  cachedTemplate = JSON.parse(templateData);
+  return cachedTemplate;
+};
 
-	const details = req.body.caseDetails ? req.body.caseDetails : dummyDetails;
-	console.log(systemPrompt + template);
-	console.log('Generating Report...');
-    console.log(details);
+const ollama = new Ollama({ fetch: fetchWithTimeout });
 
-    const ollama = new Ollama({fetch: fetchWithTimeout});
-	// Build a retrieval query from your case details (tune this!)
-	const ragQuery = [
-		details.crime,
-		details.place,
-		details.weapon,
-		details.suspect,
-		details.victim,
-		"affidavit",
-		"elements of the crime",
-		"procedure",
-		].filter(Boolean).join(" | ");
+const DEFAULT_STATION = {
+  name: "Los Banos Police Station",
+  address: { cityOrMunicipality: "Los Banos", province: "Laguna" },
+};
 
-	const { context } = await retrieveContext(ragQuery, 5);
+const AFFIDAVIT_CONFIG = {
+  "poseur-buyer": {
+    subtitle: "(Affidavit of Poseur Buyer)",
+    missingMessage: "Poseur buyer details are required.",
+    resolveAffiant: (details) => details?.poseurBuyer,
+    descriptor: (affiant) =>
+      `kagawad ng Pulisya at nakatalaga sa ${safe(affiant?.unitOrStation, "[MISSING UNIT/STATION]")}`,
+  },
+  complainant: {
+    subtitle: "(Affidavit of Complainant)",
+    missingMessage: "Complainant details are required.",
+    resolveAffiant: (details) => details?.complainant,
+    descriptor: () => "isang nagrereklamo sa kasong ito",
+  },
+  witness: {
+    subtitle: "(Affidavit of Witness)",
+    missingMessage: "At least one witness is required.",
+    resolveAffiant: (details, reqBody) => {
+      const witnesses = Array.isArray(details?.witnesses) ? details.witnesses : [];
+      if (witnesses.length === 0) return undefined;
+      const rawIndex = Number(reqBody?.witnessIndex);
+      const idx = Number.isInteger(rawIndex) && rawIndex >= 0 ? rawIndex : 0;
+      return witnesses[idx] ?? witnesses[0];
+    },
+    descriptor: () => "isang saksi sa kasong ito",
+  },
+};
 
-	// Include the template too (right now you only log it)
-	const userPayload = {
-		caseDetails: details,
-		template: JSON.parse(template), // or template string
-		referenceMaterials: context,
-		};
+const getAffiantAge = (affiant) => {
+  if (Number.isFinite(affiant?.age)) return Math.floor(affiant.age);
+  const dob = safeDate(affiant?.dateOfBirth);
+  return dob ? new Date().getFullYear() - dob.getFullYear() : "[MISSING AGE]";
+};
 
-	const response = await ollama.chat({
-		model: "gemma3:27b",
-		messages: [
-			{
-			role: "system",
-			content:
-				systemPrompt +
-				"\n\nRULES:\n" +
-				"1) Use ONLY the provided caseDetails and referenceMaterials.\n" +
-				"2) If a fact is not explicitly in those, underline it.\n" +
-				"3) Output must match the JSON schema.\n" +
-				"4) Remove duplicate information from the narrative.\n" +
-				"5) If the caseDetails are missing key information, do not fabricate it. Just leave it out or say it's missing.\n" +
-				"6) The narrative should be in Tagalog.\n\n" 
-			},
-			{ role: "user", content: JSON.stringify(userPayload) },
-		],
-		format: z.toJSONSchema(CustomElementArraySchema),
-	});
+const buildAffidavitDocument = ({
+  subtitle,
+  affiant,
+  descriptor,
+  details,
+  station,
+  narrative,
+}) => {
+  const reportDate = safeDate(details?.reportDate);
+  const {
+    municipality: incidentMunicipality,
+    province: incidentProvince,
+  } = extractMunicipalityProvince(details?.incidentLocation);
 
-	const narrative = JSON.parse(response.message.content);
-	for (var i = 0; i < narrative.length; i++) {
-		narrative[i].children[0].text = (i + 1).toString() + ". " + narrative[i].children[0].text;
-	}
-	narrative.forEach((event) => console.log(event));
+  const incProvince = safe(incidentProvince, "[MISSING PROVINCE]");
+  const incMuni = safe(incidentMunicipality, "[MISSING MUNICIPALITY]");
+  const incPlace = municipalityProvinceFormatter(details?.incidentLocation);
+  const stationAddr = formatAddressForReport(station);
+  const assignedOfficerName = safe(details?.assignedOfficer?.fullName, "[MISSING OFFICER NAME]");
+  const affiantName = safe(affiant?.fullName, "[MISSING NAME]");
+  const affiantNameUpper = safeUpper(affiant?.fullName, "[MISSING NAME]");
+  const affiantAddress = formatAddressForReport(affiant);
+  const affiantAge = safe(getAffiantAge(affiant), "[MISSING AGE]");
 
-    // dummy narrative
-    // const narrative = "NARRATIVE";
+  const header = [
+    {
+      type: "paragraph",
+      children: [{ text: `Lalawigan ng ${incProvince}`, bold: true }],
+    },
+    {
+      type: "paragraph",
+      children: [{ text: `Bayan ng ${incMuni}` }],
+    },
+    {
+      type: "paragraph",
+      children: [{ text: "x -------------------------------- x" }],
+    },
+    {
+      type: "paragraph",
+      children: [{ text: "SINUMPAANG SALAYSAY", bold: true, underline: true }],
+      align: "center",
+    },
+    {
+      type: "paragraph",
+      align: "center",
+      children: [{ text: subtitle }],
+    },
+    {
+      type: "paragraph",
+      align: "justify",
+      children: [
+        {
+          text:
+            `AKO, ${affiantNameUpper} ${affiantAge} taong-gulang, ` +
+            `${descriptor}, naninirahan sa ${affiantAddress}, matapos na ` +
+            `makapanumpa alinsunod sa ipinag-uutos ng Saligang Batas ng Pilipinas ` +
+            `ay malaya at kusang loob na nagsasalaysay gaya ng mga sumusunod:`,
+        },
+      ],
+    },
+  ];
 
+  const footer = [
+    {
+      type: "paragraph",
+      align: "justify",
+      children: [{ text: "" }],
+    },
+    {
+      type: "paragraph",
+      align: "justify",
+      children: [
+        { text: "SA KATUNAYAN NG LAHAT", bold: true },
+        {
+          text:
+            ` ay lumagda ako ng aking pangalan at apelyido ngayong ika-` +
+            `${safe(reportDate?.getDate(), "[MISSING DAY]")} ng ` +
+            `${reportDate ? monthName(reportDate) : "[MISSING MONTH]"} ` +
+            `${safe(reportDate?.getFullYear(), "[MISSING YEAR]")} dito sa ${incPlace}.`,
+        },
+      ],
+    },
+    {
+      type: "paragraph",
+      align: "left",
+      children: [{ text: "" }],
+    },
+    { type: "paragraph", align: "right", children: [{ text: affiantName }] },
+    {
+      type: "paragraph",
+      align: "right",
+      children: [{ text: "(Nagsalaysay)" }],
+    },
+    {
+      type: "paragraph",
+      align: "center",
+      children: [{ text: "CERTIFICATION", underline: true, bold: true }],
+    },
+    {
+      type: "paragraph",
+      align: "justify",
+      children: [
+        {
+          text:
+            `SWORN AND SUBSCRIBED TO BEFORE ME this ` +
+            `${safe(reportDate?.getDate(), "[MISSING DAY]")} day of ` +
+            `${reportDate ? monthName(reportDate) : "[MISSING MONTH]"} ` +
+            `${safe(reportDate?.getFullYear(), "[MISSING YEAR]")} at ` +
+            `${safe(stationAddr, "[MISSING STATION ADDRESS]")} and further certify that ` +
+            `I personally examined the affiant and that I am fully satisfied that ` +
+            `he/she voluntarily executed and understood the contents of the foregoing statements.`,
+        },
+      ],
+    },
+    {
+      type: "paragraph",
+      align: "left",
+      children: [{ text: "" }],
+    },
+    { type: "paragraph", align: "right", children: [{ text: assignedOfficerName }] },
+    {
+      type: "paragraph",
+      align: "right",
+      children: [{ text: "Administering Officer" }],
+    },
+  ];
 
-    console.log("printing events...");
+  return header.concat(narrative, footer);
+};
 
+const createRagQuery = (details) => {
+  const suspectNames = Array.isArray(details?.suspects)
+    ? details.suspects.map((s) => s?.fullName).filter(Boolean)
+    : [];
 
-    console.log("done printing events...");
+  return [
+    details?.incidentType,
+    details?.caseTitle,
+    details?.incidentLocation?.cityOrMunicipality,
+    details?.incidentLocation?.province,
+    ...suspectNames,
+    "affidavit",
+    "elements of the crime",
+    "procedure",
+  ]
+    .filter(Boolean)
+    .join(" | ");
+};
 
+const generateNarrative = async (details, template, affidavitKind) => {
+  const ragQuery = createRagQuery(details);
+  const { context } = await retrieveContext(ragQuery, 5);
 
+  const userPayload = {
+    affidavitType: affidavitKind,
+    caseDetails: details,
+    template,
+    referenceMaterials: context,
+  };
 
+  const response = await ollama.chat({
+    model: "gemma3:latest",
+    messages: [
+      {
+        role: "system",
+        content:
+          systemPrompt +
+          "\n\nRULES:\n" +
+          "1) Use ONLY the provided caseDetails and referenceMaterials.\n" +
+          "2) If a fact is not explicitly in those, underline it.\n" +
+          "3) Output must match the JSON schema.\n" +
+          "4) Remove duplicate information from the narrative.\n" +
+          "5) If the caseDetails are missing key information, do not fabricate it. Just leave it out or say it's missing.\n" +
+          "6) The narrative should be in Tagalog.\n\n",
+      },
+      { role: "user", content: JSON.stringify(userPayload) },
+    ],
+    format: z.toJSONSchema(CustomElementArraySchema),
+  });
 
-	const station = req.body.policeStation
-	? req.body.policeStation
-	: { name: "Los Banos Police Station", address: { cityOrMunicipality: "Los Banos", province: "Laguna" } };
+  const parsed = JSON.parse(response.message.content);
+  if (!Array.isArray(parsed)) {
+    throw new Error("Model response format is invalid.");
+  }
 
-	// Parse dates safely
-	let reportDate = safeDate(details?.reportDate);
-	let incidentDate = safeDate(details?.incidentDate);
-	
-	reportDate = new Date(details.reportDate);
-    incidentDate = new Date(details.incidentDate);
+  for (let i = 0; i < parsed.length; i++) {
+    if (parsed[i]?.children?.[0]?.text) {
+      parsed[i].children[0].text = `${i + 1}. ${parsed[i].children[0].text}`;
+    }
+  }
 
-	// Poseur Buyer safe fields
-	const poseurName = safeUpper(details?.poseurBuyer?.fullName, "[MISSING NAME]");
-	const poseurDob = safeDate(details?.poseurBuyer?.dateOfBirth);
-	const poseurAge = poseurDob ? new Date().getFullYear() - poseurDob.getFullYear() : "[MISSING AGE]";
-	const poseurUnit = safe(details?.poseurBuyer?.unitOrStation, "[MISSING UNIT/STATION]");
-	const poseurAddr = municipalityProvinceFormatter(details?.poseurBuyer?.address);
+  return { response, narrative: parsed };
+};
 
-	// Incident location safe fields
-	const incProvince = safe(details?.incidentLocation?.province, "[MISSING PROVINCE]");
-	const incMuni = safe(details?.incidentLocation?.cityOrMunicipality, "[MISSING MUNICIPALITY]");
-	const incPlace = municipalityProvinceFormatter(details?.incidentLocation);
+const handleGenerateAffidavit = async (req, res, affidavitKind) => {
+  try {
+    const config = AFFIDAVIT_CONFIG[affidavitKind];
+    if (!config) {
+      return res.status(400).json({ error: "Invalid affidavit type." });
+    }
 
-	// Station address could be a string or an object—support both
-	const stationAddr =
-	typeof station?.address === "string"
-		? station.address
-		: municipalityProvinceFormatter(station?.address);
+    let template;
+    try {
+      template = getTemplate();
+    } catch (err) {
+      console.error("Error reading template:", err);
+      return res.status(500).json({ error: "Template file not found" });
+    }
 
-	// Assigned officer safe
-	const assignedOfficerName = safe(details?.assignedOfficer?.fullName, "[MISSING OFFICER NAME]");
+    const details = req.body.caseDetails ? req.body.caseDetails : dummyDetails;
+    const station = req.body.policeStation || details?.policeStation || DEFAULT_STATION;
+    const affiant = config.resolveAffiant(details, req.body);
 
+    if (!affiant) {
+      return res.status(400).json({
+        error: "Missing affidavit data",
+        message: config.missingMessage,
+      });
+    }
 
-		// affidavit of poseur buyer specific
-		const header = [
-			{
-				type: "paragraph",
-				children: [{ text: `Lalawigan ng ${incProvince}`, bold: true }],
-			},
-			{
-				type: "paragraph",
-				children: [{ text: `Bayan ng ${incMuni}` }],
-			},
-			{
-				"type": "paragraph",
-				"children": [
-					{
-						"text": "x -------------------------------- x"
-					}
-				]
-			},
-			{
-				"type": "paragraph",
-				"children": [
-					{
-						"text": "SINUMPAANG SALAYSAY",
-						"bold": true,
-						"underline": true
-					}
-				],
-				"align": "center"
-			},
-			{
-				"type": "paragraph",
-				"align": "center",
-				"children": [
-					{
-						"text": "(Affidavit of Poseur Buyer)"
-					}
-				]
-			},
-			{
-				type: "paragraph",
-				align: "justify",
-				children: [
-				{
-					text:
-					`AKO, ${poseurName} ${poseurAge} taong-gulang, ` +
-					`kagawad ng Pulisya at nakatalaga sa ${poseurUnit}, ` +
-					`naninirahan sa ${poseurAddr}, matapos na makapanumpa ` +
-					`alinsunod sa ipinag-uutos ng Saligang Batas ng Pilipinas ay ` +
-					`malaya at kusang loob na nagsasalaysay gaya ng mga sumusunod:`,
-				},
-				],
-			},
-		];
+    const descriptor = config.descriptor(affiant, details);
+    const { response, narrative } = await generateNarrative(details, template, affidavitKind);
+    const affidavitNodes = buildAffidavitDocument({
+      subtitle: config.subtitle,
+      affiant,
+      descriptor,
+      details,
+      station,
+      narrative,
+    });
 
-		const footer = [
+    response.message.content = JSON.stringify(affidavitNodes);
+    console.log("Total Generation Time (s): " + response.total_duration / 1000000000);
+    return res.status(200).send(response);
+  } catch (error) {
+    console.error("Error calling Ollama:", error);
 
-			{
-				"type": "paragraph",
-				"align": "justify",
-				"children": [
-					{
-						"text": ""
-					}
-				]
-			},
-			{
-				type: "paragraph",
-				align: "justify",
-				children: [
-				{ text: "SA KATUNAYAN NG LAHAT", bold: true },
-				{
-					text:
-					` ay lumagda ako ng aking pangalan at apelyido ngayong ika-` +
-					`${safe(reportDate?.getDate(), "[MISSING DAY]")} ng ` +
-					`${reportDate ? monthName(reportDate) : "[MISSING MONTH]"} ` +
-					`${safe(reportDate?.getFullYear(), "[MISSING YEAR]")} dito sa ${incPlace}.`,
-				},
-				],
-			},
-			{
-				"type": "paragraph",
-				"align": "left",
-				"children": [
-					{
-						"text": ""
-					}
-				]
-			},
- 			{ type: "paragraph", align: "right", children: [{ text: safe(details?.poseurBuyer?.fullName, "[MISSING NAME]") }] },
-			{
-				"type": "paragraph",
-				"align": "right",
-				"children": [
-					{
-						"text": "(Nagsalaysay)"
-					}
-				]
-			},
-			{
-				"type": "paragraph",
-				"align": "center",
-				"children": [
-					{
-						"text": "CERTIFICATION",
-						"underline": true,
-						"bold": true
-					}
-				]
-			},
-			{
-				type: "paragraph",
-				align: "justify",
-				children: [
-				{
-					text:
-					`SWORN AND SUBSCRIBED TO BEFORE ME this ` +
-					`${safe(reportDate?.getDate(), "[MISSING DAY]")} day of ` +
-					`${reportDate ? monthName(reportDate) : "[MISSING MONTH]"} ` +
-					`${safe(reportDate?.getFullYear(), "[MISSING YEAR]")} at ` +
-					`${safe(stationAddr, "[MISSING STATION ADDRESS]")} and further certify that ` +
-					`I personally examined the affiant and that I am fully satisfied that ` +
-					`he/she voluntarily executed and understood the contents of the foregoing statements.`,
-				},
-				],
-			},
-			{
-				"type": "paragraph",
-				"align": "left",
-				"children": [
-					{
-						"text": ""
-					}
-				]
-			},
-			{ type: "paragraph", align: "right", children: [{ text: assignedOfficerName }] },
-			{
-				"type": "paragraph",
-				"align": "right",
-				"children": [
-					{
-						"text": "Administering Officer"
-					}
-				]
-			}
-		];
+    if (error.code === "UND_ERR_HEADERS_TIMEOUT") {
+      return res.status(504).json({
+        error: "Ollama request timeout",
+        message: "The request took too long. Try a smaller model or simpler request.",
+      });
+    }
+    if (error.message.includes("fetch failed") || error.message.includes("connect")) {
+      return res.status(503).json({
+        error: "Ollama service unavailable",
+        message: 'Make sure Ollama is running. Run "ollama serve" in terminal.',
+      });
+    }
+    return res.status(500).json({
+      error: "Generation failed",
+      message: error.message,
+    });
+  }
+};
 
-    // let response = {message: {content: {}}};
-    // response.message.content = JSON.stringify(header.concat(narrative, footer));
-
-    console.log(response);
-
-		response.message.content = JSON.stringify(header.concat(narrative, footer));
-		// end of affidavit of poseur buyer specific
-
-		console.log("Total Generation Time (s): " + response.total_duration / 1000000000);
-		res.status(200);
-		res.send(response);
-	} catch (error) {
-		console.error('Error calling Ollama:', error);
-
-		if (error.code === 'UND_ERR_HEADERS_TIMEOUT') {
-			res.status(504).json({ 
-				error: 'Ollama request timeout', 
-				message: 'The request took too long. Try a smaller model or simpler request.' 
-			});
-		} else if (error.message.includes('fetch failed') || error.message.includes('connect')) {
-			res.status(503).json({ 
-				error: 'Ollama service unavailable', 
-				message: 'Make sure Ollama is running. Run "ollama serve" in terminal.' 
-			});
-		} else {
-			res.status(500).json({ 
-				error: 'Generation failed', 
-				message: error.message 
-			});
-		}
-	}
-
-
-
-});
+app.post("/api/generate", async (req, res) => handleGenerateAffidavit(req, res, "poseur-buyer"));
+app.post("/api/generate/poseur-buyer", async (req, res) => handleGenerateAffidavit(req, res, "poseur-buyer"));
+app.post("/api/generate/complainant", async (req, res) => handleGenerateAffidavit(req, res, "complainant"));
+app.post("/api/generate/witness", async (req, res) => handleGenerateAffidavit(req, res, "witness"));
 
 const AskSchema = z.object({
   question: z.string().min(1, "question is required"),
@@ -445,9 +520,8 @@ app.post("/api/ask", async (req, res) => {
       retrievedContext || "(No retrieved context.)",
     ].join("\n");
 
-    const ollama = new Ollama({ fetch: fetchWithTimeout });
     const response = await ollama.chat({
-      model: "gemma3:27b",
+      model: "gemma3:latest",
       messages: [
         { role: "system", content: buildGovFiscalSystemPrompt() },
         { role: "user", content: `CONTEXT:\n${combinedContext}\n\nQUESTION:\n${question}` },

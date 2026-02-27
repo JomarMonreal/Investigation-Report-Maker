@@ -177,4 +177,4 @@ const SuspectForm: React.FC<SuspectFormProps> = ({ suspect, onChange }) => {
     </Stack>
   );
 };
-export default SuspectForm;
+export default React.memo(SuspectForm);

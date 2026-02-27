@@ -141,4 +141,4 @@ const PhilippineAddressForm: React.FC<PhilippineAddressFormProps> = ({
   );
 };
 
-export default PhilippineAddressForm;
+export default React.memo(PhilippineAddressForm);

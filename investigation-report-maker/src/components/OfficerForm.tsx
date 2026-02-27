@@ -43,4 +43,4 @@ const OfficerForm: React.FC<OfficerFormProps> = ({ officer, onChange }) => {
   );
 };
 
-export default OfficerForm;
+export default React.memo(OfficerForm);

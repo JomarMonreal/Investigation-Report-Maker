@@ -123,4 +123,4 @@ const PoseurBuyerForm: React.FC<PoseurBuyerFormProps> = ({
     </Stack>
   );
 };
-export default PoseurBuyerForm;
+export default React.memo(PoseurBuyerForm);

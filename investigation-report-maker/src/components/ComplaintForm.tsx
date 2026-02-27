@@ -198,4 +198,4 @@ const ComplainantForm: React.FC<ComplainantFormProps> = ({
     </Stack>
   );
 };
-export default ComplainantForm;
+export default React.memo(ComplainantForm);

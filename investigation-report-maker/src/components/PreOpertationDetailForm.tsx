@@ -260,4 +260,4 @@ const PreOperationDetailsForm: React.FC<PreOperationDetailsFormProps> = ({
     </Stack>
   );
 };
-export default PreOperationDetailsForm;
+export default React.memo(PreOperationDetailsForm);

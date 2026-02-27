@@ -58,4 +58,4 @@ const OfficerOptionalForm: React.FC<OfficerOptionalFormProps> = ({
     </Stack>
   );
 };
-export default OfficerOptionalForm;
+export default React.memo(OfficerOptionalForm);

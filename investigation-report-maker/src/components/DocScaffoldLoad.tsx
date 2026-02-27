@@ -64,11 +64,11 @@ const DocScaffoldLoad: React.FC<DocScaffoldLoadProps> = ({
     field: K,
     value: typeof caseDetails[K],
   ): void => {
-    setCaseDetails({
-      ...caseDetails,
+    setCaseDetails((prev) => ({
+      ...prev,
       [field]: value,
-    });
-  }
+    }));
+  };
 
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
 
@@ -133,7 +133,11 @@ const DocScaffoldLoad: React.FC<DocScaffoldLoadProps> = ({
   const handleViewChange = React.useCallback(
     (_: React.MouseEvent<HTMLElement>, next: ReportView | null) => {
       if (!next) return;
-      onViewChange ? onViewChange(next) : setInternalView(next);
+      if (onViewChange) {
+        onViewChange(next);
+        return;
+      }
+      setInternalView(next);
     },
     [onViewChange]
   );
@@ -250,7 +254,7 @@ const DocScaffoldLoad: React.FC<DocScaffoldLoadProps> = ({
       </Stack>
 
         <hr  />
-      <EditorToolbar />
+      {activeView === "result" && <EditorToolbar />}
 
       <Stack direction="row" spacing={1.5} sx={{ minHeight: 560 }}>
         <Box sx={{ flex: 1, minWidth: 0 }}>

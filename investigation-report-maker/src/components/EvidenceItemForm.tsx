@@ -166,4 +166,4 @@ const EvidenceItemForm: React.FC<EvidenceItemFormProps> = ({
     </Stack>
   );
 };
-export default EvidenceItemForm;
+export default React.memo(EvidenceItemForm);
