@@ -117,7 +117,7 @@ app.post('/api/generate', async (req, res) => {
 		};
 
 	const response = await ollama.chat({
-		model: "gemma3:latest",
+		model: "gemma3:27b",
 		messages: [
 			{
 			role: "system",
@@ -447,7 +447,7 @@ app.post("/api/ask", async (req, res) => {
 
     const ollama = new Ollama({ fetch: fetchWithTimeout });
     const response = await ollama.chat({
-      model: "gemma3:latest",
+      model: "gemma3:27b",
       messages: [
         { role: "system", content: buildGovFiscalSystemPrompt() },
         { role: "user", content: `CONTEXT:\n${combinedContext}\n\nQUESTION:\n${question}` },
