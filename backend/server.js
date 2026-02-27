@@ -177,6 +177,19 @@ const AFFIDAVIT_CONFIG = {
     },
     descriptor: () => "isang saksi sa kasong ito",
   },
+  "arresting-officer": {
+    subtitle: "(Affidavit of Arresting Officer)",
+    missingMessage: "At least one arresting officer is required.",
+    resolveAffiant: (details, reqBody) => {
+      const officers = Array.isArray(details?.arrestingOfficers) ? details.arrestingOfficers : [];
+      if (officers.length === 0) return undefined;
+      const rawIndex = Number(reqBody?.arrestingOfficerIndex);
+      const idx = Number.isInteger(rawIndex) && rawIndex >= 0 ? rawIndex : 0;
+      return officers[idx] ?? officers[0];
+    },
+    descriptor: (affiant) =>
+      `kagawad ng Pulisya at nakatalaga sa ${safe(affiant?.unitOrStation, "[MISSING UNIT/STATION]")}`,
+  },
 };
 
 const getAffiantAge = (affiant) => {
@@ -458,6 +471,7 @@ app.post("/api/generate", async (req, res) => handleGenerateAffidavit(req, res, 
 app.post("/api/generate/poseur-buyer", async (req, res) => handleGenerateAffidavit(req, res, "poseur-buyer"));
 app.post("/api/generate/complainant", async (req, res) => handleGenerateAffidavit(req, res, "complainant"));
 app.post("/api/generate/witness", async (req, res) => handleGenerateAffidavit(req, res, "witness"));
+app.post("/api/generate/arresting-officer", async (req, res) => handleGenerateAffidavit(req, res, "arresting-officer"));
 
 const AskSchema = z.object({
   question: z.string().min(1, "question is required"),

@@ -24,6 +24,7 @@ import {
   DialogContent,
   DialogActions,
   Button,
+  TextField,
   Typography,
   Stack,
 } from "@mui/material";
@@ -59,12 +60,14 @@ const isServerUnavailable = (err: unknown): boolean => {
   );
 };
 
-type AffidavitKind = "poseur-buyer" | "complainant" | "witness";
+type AffidavitKind = "poseur-buyer" | "complainant" | "witness" | "arresting-officer";
+type AffiantSelectionKind = "witness" | "arresting-officer";
 
 const AFFIDAVIT_ENDPOINT: Record<AffidavitKind, string> = {
   "poseur-buyer": "/api/generate/poseur-buyer",
   complainant: "/api/generate/complainant",
   witness: "/api/generate/witness",
+  "arresting-officer": "/api/generate/arresting-officer",
 };
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -105,9 +108,15 @@ const validateOfficer = (
   missing: string[],
   officer: Officer | PoseurBuyer | undefined,
   labelPrefix: string,
+  options?: {
+    requireAddress?: boolean;
+  },
 ): void => {
+  const requireAddress = options?.requireAddress ?? true;
   addRequiredText(missing, `${labelPrefix} full name`, officer?.fullName);
-  addRequiredText(missing, `${labelPrefix} address`, officer?.address);
+  if (requireAddress) {
+    addRequiredText(missing, `${labelPrefix} address`, officer?.address);
+  }
   addRequiredText(missing, `${labelPrefix} rank/position`, officer?.rankOrPosition);
   addRequiredText(missing, `${labelPrefix} unit/station`, officer?.unitOrStation);
   addRequiredText(missing, `${labelPrefix} badge number`, officer?.badgeNumber);
@@ -137,6 +146,10 @@ const validateCaseDetailsForAffidavit = (
   details: CaseDetails,
   station: PoliceStation,
   kind: AffidavitKind,
+  options?: {
+    witnessIndex?: number;
+    arrestingOfficerIndex?: number;
+  },
 ): string[] => {
   const missing: string[] = [];
 
@@ -148,24 +161,28 @@ const validateCaseDetailsForAffidavit = (
   addRequiredText(missing, "Investigating unit", details.investigatingUnit);
   validateAddress(missing, details.incidentLocation, "Incident location");
 
-  validateOfficer(missing, details.assignedOfficer, "Assigned officer");
+  validateOfficer(missing, details.assignedOfficer, "Assigned officer", {
+    requireAddress: false,
+  });
 
   addRequiredText(missing, "Complainant full name", details.complainant?.fullName);
   addRequiredText(missing, "Complainant address", details.complainant?.address);
 
-  addRequiredText(missing, "Evidence summary", details.evidenceSummary);
-  addRequiredText(missing, "Incident summary", details.incidentSummary);
-  addRequiredText(missing, "Full narrative", details.narrative);
-
   validatePoliceStation(missing, station);
 
   if (kind === "witness") {
-    if (!Array.isArray(details.witnesses) || details.witnesses.length === 0) {
+    const witnesses = Array.isArray(details.witnesses) ? details.witnesses : [];
+    if (witnesses.length === 0) {
       missing.push("At least one witness");
     } else {
-      details.witnesses.forEach((witness, index) => {
-        validateWitness(missing, witness, index + 1);
-      });
+      const rawIndex = options?.witnessIndex;
+      const selectedIndex =
+        Number.isInteger(rawIndex) && typeof rawIndex === "number" && rawIndex >= 0
+          ? rawIndex
+          : 0;
+      const witness = witnesses[selectedIndex] ?? witnesses[0];
+      const witnessNumber = witnesses[selectedIndex] ? selectedIndex + 1 : 1;
+      validateWitness(missing, witness, witnessNumber);
     }
   }
 
@@ -173,7 +190,29 @@ const validateCaseDetailsForAffidavit = (
     if (!details.poseurBuyer) {
       missing.push("Poseur buyer details");
     } else {
-      validateOfficer(missing, details.poseurBuyer, "Poseur buyer");
+      validateOfficer(missing, details.poseurBuyer, "Poseur buyer", {
+        requireAddress: false,
+      });
+    }
+  }
+
+  if (kind === "arresting-officer") {
+    const arrestingOfficers = Array.isArray(details.arrestingOfficers) ? details.arrestingOfficers : [];
+    if (arrestingOfficers.length === 0) {
+      missing.push("At least one arresting officer");
+    } else {
+      const rawIndex = options?.arrestingOfficerIndex;
+      const selectedIndex =
+        Number.isInteger(rawIndex) && typeof rawIndex === "number" && rawIndex >= 0
+          ? rawIndex
+          : 0;
+      const arrestingOfficer = arrestingOfficers[selectedIndex] ?? arrestingOfficers[0];
+      const officerLabel = arrestingOfficers[selectedIndex]
+        ? `Arresting officer ${selectedIndex + 1}`
+        : "Arresting officer 1";
+      validateOfficer(missing, arrestingOfficer, officerLabel, {
+        requireAddress: false,
+      });
     }
   }
 
@@ -205,6 +244,7 @@ const mapMissingFieldToUiLabels = (missingField: string): string[] => {
 
   if (normalized.startsWith("assigned officer ")) return ["Officer in-charge"];
   if (normalized.startsWith("poseur buyer ")) return ["Officer in-charge"];
+  if (normalized.startsWith("arresting officer ")) return ["Officer in-charge"];
 
   switch (normalized) {
     case "case number":
@@ -242,6 +282,8 @@ const formatAffidavitKind = (kind: AffidavitKind): string => {
       return "complainant";
     case "witness":
       return "witness";
+    case "arresting-officer":
+      return "arresting officer";
     default:
       return "selected";
   }
@@ -268,9 +310,16 @@ const ReportCreation: React.FC = () => {
   const { policeStation } = usePoliceOfficer();
 
   const [modeDialogOpen, setModeDialogOpen] = React.useState<boolean>(false);
+  const [selectionDialogKind, setSelectionDialogKind] = React.useState<AffiantSelectionKind | null>(null);
+  const [selectedWitnessIndex, setSelectedWitnessIndex] = React.useState<number>(0);
+  const [selectedArrestingOfficerIndex, setSelectedArrestingOfficerIndex] = React.useState<number>(0);
   const [missingFields, setMissingFields] = React.useState<string[]>([]);
   const [unmappedMissingFields, setUnmappedMissingFields] = React.useState<string[]>([]);
   const [activeValidationKind, setActiveValidationKind] = React.useState<AffidavitKind | null>(null);
+  const [activeValidationOptions, setActiveValidationOptions] = React.useState<{
+    witnessIndex?: number;
+    arrestingOfficerIndex?: number;
+  }>({});
   const detailsValidationRootRef = React.useRef<HTMLDivElement | null>(null);
   const visibleMissingFields = React.useMemo(() => missingFields.slice(0, 10), [missingFields]);
   const hasMoreMissingFields = missingFields.length > visibleMissingFields.length;
@@ -278,6 +327,20 @@ const ReportCreation: React.FC = () => {
     () => missingFields.some((field) => isPoliceStationMissingField(field)),
     [missingFields],
   );
+
+  React.useEffect(() => {
+    const maxWitnessIndex = Math.max(caseDetails.witnesses.length - 1, 0);
+    if (selectedWitnessIndex > maxWitnessIndex) {
+      setSelectedWitnessIndex(maxWitnessIndex);
+    }
+  }, [caseDetails.witnesses.length, selectedWitnessIndex]);
+
+  React.useEffect(() => {
+    const maxOfficerIndex = Math.max(caseDetails.arrestingOfficers.length - 1, 0);
+    if (selectedArrestingOfficerIndex > maxOfficerIndex) {
+      setSelectedArrestingOfficerIndex(maxOfficerIndex);
+    }
+  }, [caseDetails.arrestingOfficers.length, selectedArrestingOfficerIndex]);
 
   const getStationPayload = React.useCallback(
     (): PoliceStation =>
@@ -359,6 +422,9 @@ const ReportCreation: React.FC = () => {
         if (!matched && normalizedField === "at least one witness") {
           matched = markActionButton("Add Witness");
         }
+        if (!matched && normalizedField === "at least one arresting officer") {
+          matched = markActionButton("Add Arresting Officer");
+        }
         if (!matched && normalizedField === "poseur buyer details") {
           matched = markActionButton("Add Poseur Buyer");
         }
@@ -379,14 +445,16 @@ const ReportCreation: React.FC = () => {
       caseDetails,
       getStationPayload(),
       activeValidationKind,
+      activeValidationOptions,
     );
     setMissingFields(missing);
 
     if (missing.length === 0) {
       setUnmappedMissingFields([]);
       setActiveValidationKind(null);
+      setActiveValidationOptions({});
     }
-  }, [activeValidationKind, caseDetails, getStationPayload]);
+  }, [activeValidationKind, activeValidationOptions, caseDetails, getStationPayload]);
 
   React.useEffect(() => {
     if (view !== "details") {
@@ -398,10 +466,17 @@ const ReportCreation: React.FC = () => {
 
   const handleOpenGenerateDialog = React.useCallback(() => {
     setModeDialogOpen(true);
+    setSelectionDialogKind(null);
   }, []);
 
   const handleCloseGenerateDialog = React.useCallback(() => {
     setModeDialogOpen(false);
+    setSelectionDialogKind(null);
+  }, []);
+
+  const handleCloseSelectionDialog = React.useCallback(() => {
+    setSelectionDialogKind(null);
+    setModeDialogOpen(true);
   }, []);
 
   const handleLoadTemplate = React.useCallback(() => {
@@ -421,16 +496,24 @@ const ReportCreation: React.FC = () => {
     setFiscalOpen(true);
   }, [setSlateValue]);
 
-  const handleGenerateByKind = React.useCallback(async (kind: AffidavitKind) => {
+  const handleGenerateByKind = React.useCallback(async (
+    kind: AffidavitKind,
+    options?: {
+      witnessIndex?: number;
+      arrestingOfficerIndex?: number;
+    },
+  ) => {
     if (isGeneratingRef.current) return;
 
     const stationPayload = getStationPayload();
 
-    const missing = validateCaseDetailsForAffidavit(caseDetails, stationPayload, kind);
+    const missing = validateCaseDetailsForAffidavit(caseDetails, stationPayload, kind, options);
     if (missing.length > 0) {
       setMissingFields(missing);
       setActiveValidationKind(kind);
+      setActiveValidationOptions(options ?? {});
       setModeDialogOpen(false);
+      setSelectionDialogKind(null);
       setView("details");
       requestAnimationFrame(() => {
         detailsValidationRootRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -439,20 +522,34 @@ const ReportCreation: React.FC = () => {
     }
 
     setActiveValidationKind(null);
+    setActiveValidationOptions({});
     setMissingFields([]);
     setUnmappedMissingFields([]);
     clearValidationHighlights();
 
     isGeneratingRef.current = true;
     setModeDialogOpen(false);
+    setSelectionDialogKind(null);
 
     try {
       setIsFetching(true);
 
+      const requestPayload: Record<string, unknown> = {
+        caseDetails,
+        policeStation: stationPayload,
+        systemPrompt,
+      };
+      if (kind === "witness" && typeof options?.witnessIndex === "number") {
+        requestPayload.witnessIndex = options.witnessIndex;
+      }
+      if (kind === "arresting-officer" && typeof options?.arrestingOfficerIndex === "number") {
+        requestPayload.arrestingOfficerIndex = options.arrestingOfficerIndex;
+      }
+
       const httpResponse = await fetch(AFFIDAVIT_ENDPOINT[kind], {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ caseDetails, policeStation: stationPayload, systemPrompt }),
+        body: JSON.stringify(requestPayload),
       });
       const response = await httpResponse.json().catch(() => null);
       if (!httpResponse.ok) {
@@ -492,12 +589,53 @@ const ReportCreation: React.FC = () => {
       if (isServerUnavailable(err)) {
         await sleep(1000);
       }
-      alert(`Failed to generate ${kind} affidavit: ${err instanceof Error ? err.message : "Unknown error"}`);
+      alert(`Failed to generate ${formatAffidavitKind(kind)} affidavit: ${err instanceof Error ? err.message : "Unknown error"}`);
     } finally {
       isGeneratingRef.current = false;
       setIsFetching(false);
     }
   }, [caseDetails, clearValidationHighlights, getStationPayload, resultEditor, setIsFetching, setSlateValue, title]);
+
+  const handleSelectAffidavitKind = React.useCallback((kind: AffidavitKind) => {
+    if (kind === "witness") {
+      if (caseDetails.witnesses.length === 0) {
+        void handleGenerateByKind("witness");
+        return;
+      }
+      setSelectionDialogKind("witness");
+      setModeDialogOpen(false);
+      return;
+    }
+
+    if (kind === "arresting-officer") {
+      if (caseDetails.arrestingOfficers.length === 0) {
+        void handleGenerateByKind("arresting-officer");
+        return;
+      }
+      setSelectionDialogKind("arresting-officer");
+      setModeDialogOpen(false);
+      return;
+    }
+
+    void handleGenerateByKind(kind);
+  }, [caseDetails.arrestingOfficers.length, caseDetails.witnesses.length, handleGenerateByKind]);
+
+  const handleGenerateSelectedAffiant = React.useCallback(() => {
+    if (selectionDialogKind === "witness") {
+      void handleGenerateByKind("witness", { witnessIndex: selectedWitnessIndex });
+      return;
+    }
+    if (selectionDialogKind === "arresting-officer") {
+      void handleGenerateByKind("arresting-officer", {
+        arrestingOfficerIndex: selectedArrestingOfficerIndex,
+      });
+    }
+  }, [
+    handleGenerateByKind,
+    selectedArrestingOfficerIndex,
+    selectedWitnessIndex,
+    selectionDialogKind,
+  ]);
 
   const handleLoadError = React.useCallback((message: string) => {
     alert(`Template import failed: ${message}`);
@@ -550,6 +688,27 @@ const ReportCreation: React.FC = () => {
     event.target.value = "";
   };
 
+  const selectionOptions = React.useMemo(() => {
+    if (selectionDialogKind === "witness") {
+      return caseDetails.witnesses.map((witness, index) => ({
+        label: witness.fullName?.trim() ? `${index + 1}. ${witness.fullName}` : `${index + 1}. Witness (unnamed)`,
+        value: index,
+      }));
+    }
+    if (selectionDialogKind === "arresting-officer") {
+      return caseDetails.arrestingOfficers.map((officer, index) => ({
+        label: officer.fullName?.trim()
+          ? `${index + 1}. ${officer.fullName}`
+          : `${index + 1}. Arresting Officer (unnamed)`,
+        value: index,
+      }));
+    }
+    return [];
+  }, [caseDetails.arrestingOfficers, caseDetails.witnesses, selectionDialogKind]);
+
+  const selectedAffiantIndex =
+    selectionDialogKind === "witness" ? selectedWitnessIndex : selectedArrestingOfficerIndex;
+
   return (
     <MessagingProvider>
       <>
@@ -565,7 +724,7 @@ const ReportCreation: React.FC = () => {
               <Button
                 variant="contained"
                 fullWidth
-                onClick={() => void handleGenerateByKind("complainant")}
+                onClick={() => handleSelectAffidavitKind("complainant")}
                 disabled={isFetching}
               >
                 Generate affidavit of complainant
@@ -573,7 +732,7 @@ const ReportCreation: React.FC = () => {
               <Button
                 variant="contained"
                 fullWidth
-                onClick={() => void handleGenerateByKind("witness")}
+                onClick={() => handleSelectAffidavitKind("witness")}
                 disabled={isFetching}
               >
                 Generate affidavit of witness
@@ -581,7 +740,15 @@ const ReportCreation: React.FC = () => {
               <Button
                 variant="contained"
                 fullWidth
-                onClick={() => void handleGenerateByKind("poseur-buyer")}
+                onClick={() => handleSelectAffidavitKind("arresting-officer")}
+                disabled={isFetching}
+              >
+                Generate affidavit of arresting officer
+              </Button>
+              <Button
+                variant="contained"
+                fullWidth
+                onClick={() => handleSelectAffidavitKind("poseur-buyer")}
                 disabled={isFetching}
               >
                 Generate affidavit of poseur buyer
@@ -590,6 +757,67 @@ const ReportCreation: React.FC = () => {
           </DialogContent>
           <DialogActions>
             <Button onClick={handleCloseGenerateDialog} disabled={isFetching}>Close</Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog
+          open={selectionDialogKind !== null}
+          onClose={handleCloseSelectionDialog}
+          fullWidth
+          maxWidth="sm"
+        >
+          <DialogTitle>
+            {selectionDialogKind === "witness"
+              ? "Select Witness"
+              : "Select Arresting Officer"}
+          </DialogTitle>
+          <DialogContent dividers>
+            <Stack spacing={1.5}>
+              <Typography variant="subtitle1">
+                {selectionDialogKind === "witness"
+                  ? "Choose which witness affidavit to generate."
+                  : "Choose which arresting officer affidavit to generate."}
+              </Typography>
+              <TextField
+                label={selectionDialogKind === "witness" ? "Witness" : "Arresting Officer"}
+                select
+                fullWidth
+                size="small"
+                value={selectedAffiantIndex}
+                onChange={(event) => {
+                  const selectedIndex = Number(event.target.value);
+                  if (!Number.isInteger(selectedIndex)) return;
+                  if (selectionDialogKind === "witness") {
+                    setSelectedWitnessIndex(selectedIndex);
+                    return;
+                  }
+                  if (selectionDialogKind === "arresting-officer") {
+                    setSelectedArrestingOfficerIndex(selectedIndex);
+                  }
+                }}
+              >
+                {selectionOptions.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
+                  </MenuItem>
+                ))}
+              </TextField>
+              {selectionOptions.length === 0 && (
+                <Typography color="text.secondary" variant="body2">
+                  No available entries yet. Add one from Case Details first.
+                </Typography>
+              )}
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCloseSelectionDialog} disabled={isFetching}>Back</Button>
+            <Button
+              variant="contained"
+              onClick={handleGenerateSelectedAffiant}
+              disabled={isFetching || selectionOptions.length === 0}
+            >
+              Generate
+            </Button>
           </DialogActions>
         </Dialog>
 
