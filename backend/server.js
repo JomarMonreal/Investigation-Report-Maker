@@ -93,6 +93,8 @@ const fetchWithTimeout = (url, init = {}) => {
   }).finally(() => clearTimeout(timeoutId))
 };
 
+const LEADING_LIST_MARKER_RE = /^\s*(?:\d+[\.\)]|\(\d+\)|[-*•])\s+/;
+
 const safe = (v, placeholder = "[MISSING]") => {
   if (v === null || v === undefined) return placeholder;
   if (typeof v === "string") {
@@ -344,7 +346,7 @@ const generateNarrative = async (details, template, affidavitKind) => {
   };
 
   const response = await ollama.chat({
-    model: "gemma3:latest",
+    model: "gemma3:27b",
     messages: [
       {
         role: "system",
@@ -352,29 +354,42 @@ const generateNarrative = async (details, template, affidavitKind) => {
           systemPrompt +
           "\n\nRULES:\n" +
           "1) Use ONLY the provided caseDetails and referenceMaterials.\n" +
-          "2) If a fact is not explicitly in those, underline it.\n" +
-          "3) Output must match the JSON schema.\n" +
-          "4) Remove duplicate information from the narrative.\n" +
-          "5) If the caseDetails are missing key information, do not fabricate it. Just leave it out or say it's missing.\n" +
-          "6) The narrative should be in Tagalog.\n\n",
+          "2) Before marking anything as missing, search ALL parts of caseDetails (including nested objects, arrays, and narrative fields) and infer from there if present.\n" +
+          "3) If still missing after checking the full caseDetails, use the exact placeholder [MISSING INFO]. Do not fabricate facts.\n" +
+          "4) Output ONLY the narrative body paragraphs. Do NOT include affidavit header/footer, signatures, certification blocks, labels, or titles.\n" +
+          "5) Output must match the JSON schema exactly.\n" +
+          "6) Do NOT add numbering or bullets (no '1.', '2)', '-', etc.).\n" +
+          "7) Remove duplicate information from the narrative.\n" +
+          "8) The narrative should be in Tagalog.\n" +
+          "9) If a fact is not explicitly in caseDetails, set underline: true on the corresponding text.\n\n",
       },
       { role: "user", content: JSON.stringify(userPayload) },
     ],
     format: z.toJSONSchema(CustomElementArraySchema),
   });
 
-  const parsed = JSON.parse(response.message.content);
-  if (!Array.isArray(parsed)) {
-    throw new Error("Model response format is invalid.");
-  }
+  const raw = JSON.parse(response.message.content);
+  const parsed = CustomElementArraySchema.parse(raw);
 
-  for (let i = 0; i < parsed.length; i++) {
-    if (parsed[i]?.children?.[0]?.text) {
-      parsed[i].children[0].text = `${i + 1}. ${parsed[i].children[0].text}`;
-    }
-  }
+  const narrative = parsed.map((node) => {
+    const children = Array.isArray(node.children) ? node.children : [];
+    const normalizedChildren = children.map((child, index) => {
+      if (typeof child?.text !== "string") return { text: "" };
+      const text =
+        index === 0
+          ? child.text.replace(LEADING_LIST_MARKER_RE, "").trimStart()
+          : child.text;
+      return { ...child, text };
+    });
 
-  return { response, narrative: parsed };
+    return {
+      type: "paragraph",
+      align: "justify",
+      children: normalizedChildren.length > 0 ? normalizedChildren : [{ text: "" }],
+    };
+  });
+
+  return { response, narrative };
 };
 
 const handleGenerateAffidavit = async (req, res, affidavitKind) => {
