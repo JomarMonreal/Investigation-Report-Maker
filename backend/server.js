@@ -358,7 +358,7 @@ const generateNarrative = async (details, template, affidavitKind) => {
           "3) If still missing after checking the full caseDetails, use the exact placeholder [MISSING INFO]. Do not fabricate facts.\n" +
           "4) Output ONLY the narrative body paragraphs. Do NOT include affidavit header/footer, signatures, certification blocks, labels, or titles.\n" +
           "5) Output must match the JSON schema exactly.\n" +
-          "6) Do NOT add numbering or bullets (no '1.', '2)', '-', etc.).\n" +
+          "6) Do NOT add numbering or bullets (no '1.', '2)', '-', etc.) on header or footer.\n" +
           "7) Remove duplicate information from the narrative.\n" +
           "8) The narrative should be in Tagalog.\n" +
           "9) If a fact is not explicitly in caseDetails, set underline: true on the corresponding text.\n\n",
