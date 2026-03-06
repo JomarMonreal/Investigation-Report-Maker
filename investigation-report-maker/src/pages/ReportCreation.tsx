@@ -292,6 +292,19 @@ const formatAffidavitKind = (kind: AffidavitKind): string => {
 const isPoliceStationMissingField = (field: string): boolean =>
   normalizeUiText(field).startsWith("police station");
 
+const sanitizeFilenameSegment = (value: string, fallback: string): string => {
+  const withoutIllegalChars = value
+    .trim()
+    .replace(/[<>:"/\\|?*]+/g, "-");
+  const withoutControlChars = Array.from(withoutIllegalChars)
+    .filter((char) => char.charCodeAt(0) >= 32)
+    .join("");
+  const normalized = withoutControlChars
+    .replace(/\s+/g, " ")
+    .trim();
+  return normalized.length > 0 ? normalized : fallback;
+};
+
 const ReportCreation: React.FC = () => {
   const navigate = useNavigate();
   const [title, setTitle] = React.useState<string>("Untitled Report");
@@ -315,6 +328,7 @@ const ReportCreation: React.FC = () => {
   const [selectedArrestingOfficerIndex, setSelectedArrestingOfficerIndex] = React.useState<number>(0);
   const [missingFields, setMissingFields] = React.useState<string[]>([]);
   const [unmappedMissingFields, setUnmappedMissingFields] = React.useState<string[]>([]);
+  const [hasGeneratedReport, setHasGeneratedReport] = React.useState<boolean>(false);
   const [activeValidationKind, setActiveValidationKind] = React.useState<AffidavitKind | null>(null);
   const [activeValidationOptions, setActiveValidationOptions] = React.useState<{
     witnessIndex?: number;
@@ -585,6 +599,7 @@ const ReportCreation: React.FC = () => {
 
       setView("result");
       setSlateValue(nodes);
+      setHasGeneratedReport(true);
     } catch (err) {
       if (isServerUnavailable(err)) {
         await sleep(1000);
@@ -664,6 +679,32 @@ const ReportCreation: React.FC = () => {
 
     URL.revokeObjectURL(url);
     alert("Case details saved as JSON file.");
+    handleMenuClose();
+  };
+
+  const handleSaveGeneratedReport = () => {
+    if (!hasGeneratedReport) {
+      alert("Generate a report first before saving it as JSON.");
+      handleMenuClose();
+      return;
+    }
+
+    const fileNameBase = sanitizeFilenameSegment(
+      title || caseDetails.caseTitle || "generated-report",
+      "generated-report",
+    );
+    const fileName = `${fileNameBase}-GeneratedReport.json`;
+    const json = JSON.stringify(latestResultValueRef.current, null, 2);
+    const blob = new Blob([json], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName;
+    link.click();
+
+    URL.revokeObjectURL(url);
+    alert("Generated report saved as JSON file.");
     handleMenuClose();
   };
 
@@ -929,6 +970,12 @@ const ReportCreation: React.FC = () => {
                 </IconButton>
 
                 <Menu anchorEl={menuAnchor} open={Boolean(menuAnchor)} onClose={handleMenuClose}>
+                  <MenuItem
+                    onClick={handleSaveGeneratedReport}
+                    disabled={!hasGeneratedReport || isFetching}
+                  >
+                    Save Generated Report
+                  </MenuItem>
                   <MenuItem onClick={handleSaveCaseDetails}>Save Case Report Detail</MenuItem>
                   <label htmlFor="load-case-details">
                     <MenuItem component="span">Load Case Report Detail</MenuItem>
