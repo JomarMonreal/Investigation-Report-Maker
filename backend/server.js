@@ -7,6 +7,11 @@ const {
   formatAddressForReport,
   municipalityProvinceFormatter,
 } = require("./affidavit-address");
+const {
+  buildGovFiscalSystemPrompt,
+  ensureReportContextAttribution,
+  isReportContextQuestion,
+} = require("./chat-context");
 
 const CustomTextSchema = z.object({
 	  text: z.string(),
@@ -563,19 +568,6 @@ function slateToPlainText(nodes) {
     .trim();
 }
 
-function buildGovFiscalSystemPrompt() {
-  return [
-    "You are a government fiscal officer.",
-    "Use ONLY the provided context (authorized report slate + retrieved context).",
-    'If the context does not contain the answer, say: "I don\'t know based on the provided context."',
-	"Entertain normal conversations, basic greetings, but if the user asks for any information related to the case, only answer based on the provided context.",
-    "Write formally and neutrally.",
-    "Prefer short, numbered points.",
-    "Do not guess or infer missing figures, dates, policies, or approvals.",
-    "If you cite numbers, repeat them exactly and include units and fiscal year if present.",
-  ].join(" ");
-}
-
 app.post("/api/ask", async (req, res) => {
   try {
     const parsed = AskSchema.safeParse(req.body);
@@ -611,9 +603,12 @@ app.post("/api/ask", async (req, res) => {
       ],
     });
 
-    return res.status(200).json({
-      answer: String(response?.message?.content ?? "").trim(),
-    });
+    const rawAnswer = String(response?.message?.content ?? "").trim();
+    const answer = isReportContextQuestion(question)
+      ? ensureReportContextAttribution(rawAnswer)
+      : rawAnswer;
+
+    return res.status(200).json({ answer });
   } catch (e) {
     return res.status(500).json({
       error: "Ask failed",
@@ -665,13 +660,26 @@ const runStartupWarmup = async () => {
   console.log(`[warmup] Finished in ${Date.now() - startedAt}ms.`);
 };
 
-app.listen(PORT, (error) => {
-	if (!error) {
-		console.log("Server is running. App is listening at port " + PORT);
-    if (ENABLE_STARTUP_WARMUP) {
-      void runStartupWarmup();
+const startServer = () =>
+  app.listen(PORT, (error) => {
+	  if (!error) {
+		  console.log("Server is running. App is listening at port " + PORT);
+      if (ENABLE_STARTUP_WARMUP) {
+        void runStartupWarmup();
+      }
+    } else {
+		  console.log("Error occurred, server can't start");
     }
-  } else {
-		console.log("Error occurred, server can't start");
-  }
-});
+  });
+
+if (require.main === module) {
+  startServer();
+}
+
+module.exports = {
+  buildGovFiscalSystemPrompt,
+  ensureReportContextAttribution,
+  isReportContextQuestion,
+  slateToPlainText,
+  startServer,
+};
