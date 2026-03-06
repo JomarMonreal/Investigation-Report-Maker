@@ -48,11 +48,37 @@ type AskResponseErr = {
   details?: unknown;
 };
 
-async function askFiscal(question: string, slateValue: CaseDetailsSlateValue, signal?: AbortSignal): Promise<string> {
+type AskHistoryItem = {
+  role: "user" | "assistant";
+  content: string;
+};
+
+const MAX_CHAT_HISTORY_TURNS = 12;
+
+const toAskHistory = (messages: Message[]): AskHistoryItem[] =>
+  messages
+    .map((message): AskHistoryItem => ({
+      role: message.sender === "you" ? "user" : "assistant",
+      content: normalizeContent(message.content),
+    }))
+    .filter(
+      (message) =>
+        message.content.length > 0 &&
+        message.content !== "…" &&
+        !message.content.startsWith("Error:")
+    )
+    .slice(-MAX_CHAT_HISTORY_TURNS);
+
+async function askFiscal(
+  question: string,
+  slateValue: CaseDetailsSlateValue,
+  history: AskHistoryItem[],
+  signal?: AbortSignal
+): Promise<string> {
   const res = await fetch("/api/ask", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ question, slateValue }),
+    body: JSON.stringify({ question, slateValue, history }),
     signal,
   });
 
@@ -114,6 +140,7 @@ export const MessagingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const cleaned = normalizeContent(content);
       if (!cleaned) return;
       if (abortRef.current) return;
+      const history = toAskHistory(messages);
 
       // Add user message immediately
       setMessages((prev) => [...prev, createMessage("you", cleaned)]);
@@ -128,7 +155,7 @@ export const MessagingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         // Optional “thinking” placeholder
         send_fiscal_message("…");
 
-        const answer = await askFiscal(cleaned, slateValue, controller.signal);
+        const answer = await askFiscal(cleaned, slateValue, history, controller.signal);
 
         // If a newer request happened, ignore this result
         if (requestId !== lastRequestIdRef.current) return;
@@ -174,7 +201,7 @@ export const MessagingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         }
       }
     },
-    [send_fiscal_message, slateValue]
+    [messages, send_fiscal_message, slateValue]
   );
 
   const clear_messages = useCallback(() => {

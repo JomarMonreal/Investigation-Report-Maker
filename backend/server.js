@@ -8,7 +8,7 @@ const {
   municipalityProvinceFormatter,
 } = require("./affidavit-address");
 const {
-  buildGovFiscalSystemPrompt,
+  buildAskRequestMessages,
   ensureReportContextAttribution,
   isReportContextQuestion,
 } = require("./chat-context");
@@ -534,6 +534,14 @@ app.post("/api/generate/arresting-officer", async (req, res) => handleGenerateAf
 const AskSchema = z.object({
   question: z.string().min(1, "question is required"),
   slateValue: z.array(z.any()).optional(), // React-Slate Descendant[]
+  history: z
+    .array(
+      z.object({
+        role: z.enum(["user", "assistant"]),
+        content: z.string().min(1),
+      })
+    )
+    .optional(),
 });
 
 function slateToPlainText(nodes) {
@@ -578,7 +586,7 @@ app.post("/api/ask", async (req, res) => {
       });
     }
 
-    const { question, slateValue } = parsed.data;
+    const { question, slateValue, history } = parsed.data;
 
     // Slate -> text (authorized report content)
     const slateContext = slateToPlainText(slateValue);
@@ -594,13 +602,16 @@ app.post("/api/ask", async (req, res) => {
       retrievedContext || "(No retrieved context.)",
     ].join("\n");
 
+    const askMessages = buildAskRequestMessages({
+      combinedContext,
+      question,
+      history,
+    });
+
     const response = await ollama.chat({
       model: ASK_MODEL,
       keep_alive: OLLAMA_KEEP_ALIVE,
-      messages: [
-        { role: "system", content: buildGovFiscalSystemPrompt() },
-        { role: "user", content: `CONTEXT:\n${combinedContext}\n\nQUESTION:\n${question}` },
-      ],
+      messages: askMessages,
     });
 
     const rawAnswer = String(response?.message?.content ?? "").trim();
@@ -677,7 +688,7 @@ if (require.main === module) {
 }
 
 module.exports = {
-  buildGovFiscalSystemPrompt,
+  buildAskRequestMessages,
   ensureReportContextAttribution,
   isReportContextQuestion,
   slateToPlainText,

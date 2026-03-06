@@ -13,6 +13,7 @@ function buildGovFiscalSystemPrompt() {
 }
 
 const REPORT_CONTEXT_ATTRIBUTION = "Based on the provided report context:";
+const MAX_CHAT_HISTORY_TURNS = 12;
 const REPORT_CONTEXT_QUESTION_RE =
   /\b(this report|report|case|case details|affidavit|incident|suspect|complainant|witness|arresting officer|poseur buyer|missing details?|missing info(?:rmation)?)\b/i;
 
@@ -30,8 +31,35 @@ function ensureReportContextAttribution(answer) {
   return `${REPORT_CONTEXT_ATTRIBUTION}\n${normalized}`;
 }
 
+function normalizeAskHistory(history) {
+  if (!Array.isArray(history)) return [];
+
+  return history
+    .map((item) => {
+      const role = item?.role === "assistant" ? "assistant" : "user";
+      const content = String(item?.content || "").trim();
+      return { role, content };
+    })
+    .filter((item) => item.content.length > 0)
+    .slice(-MAX_CHAT_HISTORY_TURNS);
+}
+
+function buildAskRequestMessages({ combinedContext, question, history }) {
+  const normalizedHistory = normalizeAskHistory(history);
+  const normalizedQuestion = String(question || "").trim();
+
+  return [
+    { role: "system", content: buildGovFiscalSystemPrompt() },
+    { role: "system", content: `CONTEXT:\n${combinedContext}` },
+    ...normalizedHistory,
+    { role: "user", content: normalizedQuestion },
+  ];
+}
+
 module.exports = {
+  buildAskRequestMessages,
   buildGovFiscalSystemPrompt,
   ensureReportContextAttribution,
   isReportContextQuestion,
+  normalizeAskHistory,
 };
