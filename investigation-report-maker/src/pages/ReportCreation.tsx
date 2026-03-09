@@ -2,20 +2,11 @@ import * as React from "react";
 import { Slate, withReact } from "slate-react";
 import { createEditor, Editor, Transforms, type Descendant } from "slate";
 import type { CustomElement } from "../utils/slateHelpers";
-import type {
-  CaseDetails,
-  Officer,
-  PhilippineAddress,
-  PoliceStation,
-  PoseurBuyer,
-  Witness,
-} from "../types/CaseDatails";
+import type { PoliceStation } from "../types/CaseDatails";
 import EditorComponent from "../components/Editor/EditorComponent";
 import DocScaffoldLoad, { type ReportView } from "../components/DocScaffoldLoad";
 import { systemPrompt } from "../utils/dummy";
 import {
-  Alert,
-  AlertTitle,
   Menu,
   MenuItem,
   IconButton,
@@ -29,7 +20,6 @@ import {
   Stack,
 } from "@mui/material";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
-import { useNavigate } from "react-router-dom";
 import CaseDetailsForm from "../components/CaseDetailsForm";
 import { useCaseDetails } from "../hooks/useCaseDetails";
 import { usePoliceOfficer } from "../hooks/usePoliceOfficer";
@@ -70,210 +60,6 @@ const AFFIDAVIT_ENDPOINT: Record<AffidavitKind, string> = {
   "arresting-officer": "/api/generate/arresting-officer",
 };
 
-const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-const TIME_24H_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
-
-const hasText = (value: unknown): value is string =>
-  typeof value === "string" && value.trim().length > 0;
-
-const addRequiredText = (missing: string[], label: string, value: unknown): void => {
-  if (!hasText(value)) {
-    missing.push(label);
-  }
-};
-
-const addRequiredDate = (missing: string[], label: string, value: unknown): void => {
-  if (!hasText(value) || !ISO_DATE_RE.test(value.trim())) {
-    missing.push(`${label} (YYYY-MM-DD)`);
-  }
-};
-
-const addRequiredTime = (missing: string[], label: string, value: unknown): void => {
-  if (!hasText(value) || !TIME_24H_RE.test(value.trim())) {
-    missing.push(`${label} (HH:MM 24-hour)`);
-  }
-};
-
-const validateAddress = (
-  missing: string[],
-  address: PhilippineAddress | undefined,
-  labelPrefix: string,
-): void => {
-  addRequiredText(missing, `${labelPrefix} barangay`, address?.barangay);
-  addRequiredText(missing, `${labelPrefix} city/municipality`, address?.cityOrMunicipality);
-  addRequiredText(missing, `${labelPrefix} province`, address?.province);
-};
-
-const validateOfficer = (
-  missing: string[],
-  officer: Officer | PoseurBuyer | undefined,
-  labelPrefix: string,
-  options?: {
-    requireAddress?: boolean;
-  },
-): void => {
-  const requireAddress = options?.requireAddress ?? true;
-  addRequiredText(missing, `${labelPrefix} full name`, officer?.fullName);
-  if (requireAddress) {
-    addRequiredText(missing, `${labelPrefix} address`, officer?.address);
-  }
-  addRequiredText(missing, `${labelPrefix} rank/position`, officer?.rankOrPosition);
-  addRequiredText(missing, `${labelPrefix} unit/station`, officer?.unitOrStation);
-  addRequiredText(missing, `${labelPrefix} badge number`, officer?.badgeNumber);
-};
-
-const validateWitness = (
-  missing: string[],
-  witness: Witness,
-  witnessNumber: number,
-): void => {
-  const prefix = `Witness ${witnessNumber}`;
-  addRequiredText(missing, `${prefix} full name`, witness.fullName);
-  addRequiredText(missing, `${prefix} address`, witness.address);
-  addRequiredText(missing, `${prefix} location during incident`, witness.locationDuringIncident);
-  addRequiredText(missing, `${prefix} observation narrative`, witness.observationNarrative);
-};
-
-const validatePoliceStation = (
-  missing: string[],
-  station: PoliceStation | undefined,
-): void => {
-  addRequiredText(missing, "Police station name", station?.name);
-  validateAddress(missing, station?.address, "Police station address");
-};
-
-const validateCaseDetailsForAffidavit = (
-  details: CaseDetails,
-  station: PoliceStation,
-  kind: AffidavitKind,
-  options?: {
-    witnessIndex?: number;
-    arrestingOfficerIndex?: number;
-  },
-): string[] => {
-  const missing: string[] = [];
-
-  addRequiredText(missing, "Case number", details.caseNumber);
-  addRequiredText(missing, "Case title", details.caseTitle);
-  addRequiredDate(missing, "Incident date", details.incidentDate);
-  addRequiredTime(missing, "Incident time", details.incidentTime);
-  addRequiredText(missing, "Incident type", details.incidentType);
-  addRequiredText(missing, "Investigating unit", details.investigatingUnit);
-  validateAddress(missing, details.incidentLocation, "Incident location");
-
-  validateOfficer(missing, details.assignedOfficer, "Assigned officer", {
-    requireAddress: false,
-  });
-
-  addRequiredText(missing, "Complainant full name", details.complainant?.fullName);
-  addRequiredText(missing, "Complainant address", details.complainant?.address);
-
-  validatePoliceStation(missing, station);
-
-  if (kind === "witness") {
-    const witnesses = Array.isArray(details.witnesses) ? details.witnesses : [];
-    if (witnesses.length === 0) {
-      missing.push("At least one witness");
-    } else {
-      const rawIndex = options?.witnessIndex;
-      const selectedIndex =
-        Number.isInteger(rawIndex) && typeof rawIndex === "number" && rawIndex >= 0
-          ? rawIndex
-          : 0;
-      const witness = witnesses[selectedIndex] ?? witnesses[0];
-      const witnessNumber = witnesses[selectedIndex] ? selectedIndex + 1 : 1;
-      validateWitness(missing, witness, witnessNumber);
-    }
-  }
-
-  if (kind === "poseur-buyer") {
-    if (!details.poseurBuyer) {
-      missing.push("Poseur buyer details");
-    } else {
-      validateOfficer(missing, details.poseurBuyer, "Poseur buyer", {
-        requireAddress: false,
-      });
-    }
-  }
-
-  if (kind === "arresting-officer") {
-    const arrestingOfficers = Array.isArray(details.arrestingOfficers) ? details.arrestingOfficers : [];
-    if (arrestingOfficers.length === 0) {
-      missing.push("At least one arresting officer");
-    } else {
-      const rawIndex = options?.arrestingOfficerIndex;
-      const selectedIndex =
-        Number.isInteger(rawIndex) && typeof rawIndex === "number" && rawIndex >= 0
-          ? rawIndex
-          : 0;
-      const arrestingOfficer = arrestingOfficers[selectedIndex] ?? arrestingOfficers[0];
-      const officerLabel = arrestingOfficers[selectedIndex]
-        ? `Arresting officer ${selectedIndex + 1}`
-        : "Arresting officer 1";
-      validateOfficer(missing, arrestingOfficer, officerLabel, {
-        requireAddress: false,
-      });
-    }
-  }
-
-  return Array.from(new Set(missing));
-};
-
-const normalizeUiText = (value: string): string =>
-  value
-    .replace(/\s+/g, " ")
-    .replace(/\*$/g, "")
-    .trim()
-    .toLowerCase();
-
-const mapMissingFieldToUiLabels = (missingField: string): string[] => {
-  const normalized = normalizeUiText(missingField);
-
-  if (normalized.startsWith("witness ")) {
-    if (normalized.endsWith("full name")) return ["Full Name"];
-    if (normalized.endsWith("address")) return ["Address"];
-    if (normalized.endsWith("location during incident")) return ["Location During Incident"];
-    if (normalized.endsWith("observation narrative")) return ["Observation Narrative"];
-  }
-
-  if (normalized.startsWith("incident location ")) {
-    if (normalized.endsWith("barangay")) return ["Barangay"];
-    if (normalized.endsWith("city/municipality")) return ["City / Municipality"];
-    if (normalized.endsWith("province")) return ["Province"];
-  }
-
-  if (normalized.startsWith("assigned officer ")) return ["Officer in-charge"];
-  if (normalized.startsWith("poseur buyer ")) return ["Officer in-charge"];
-  if (normalized.startsWith("arresting officer ")) return ["Officer in-charge"];
-
-  switch (normalized) {
-    case "case number":
-      return ["Case Number"];
-    case "case title":
-      return ["Case Title"];
-    case "incident date (yyyy-mm-dd)":
-      return ["Incident Date (YYYY-MM-DD)"];
-    case "incident time (hh:mm 24-hour)":
-      return ["Incident Time (HH:MM)"];
-    case "incident type":
-      return ["Incident Type"];
-    case "investigating unit":
-      return ["Investigating Unit"];
-    case "complainant full name":
-      return ["Full Name"];
-    case "complainant address":
-      return ["Address"];
-    case "evidence summary":
-      return ["Evidence Summary"];
-    case "incident summary":
-      return ["Incident Summary"];
-    case "full narrative":
-      return ["Full Narrative"];
-    default:
-      return [];
-  }
-};
-
 const formatAffidavitKind = (kind: AffidavitKind): string => {
   switch (kind) {
     case "poseur-buyer":
@@ -289,9 +75,6 @@ const formatAffidavitKind = (kind: AffidavitKind): string => {
   }
 };
 
-const isPoliceStationMissingField = (field: string): boolean =>
-  normalizeUiText(field).startsWith("police station");
-
 const sanitizeFilenameSegment = (value: string, fallback: string): string => {
   const withoutIllegalChars = value
     .trim()
@@ -306,7 +89,6 @@ const sanitizeFilenameSegment = (value: string, fallback: string): string => {
 };
 
 const ReportCreation: React.FC = () => {
-  const navigate = useNavigate();
   const [title, setTitle] = React.useState<string>("Untitled Report");
   const [view, setView] = React.useState<ReportView>("details");
 
@@ -326,21 +108,7 @@ const ReportCreation: React.FC = () => {
   const [selectionDialogKind, setSelectionDialogKind] = React.useState<AffiantSelectionKind | null>(null);
   const [selectedWitnessIndex, setSelectedWitnessIndex] = React.useState<number>(0);
   const [selectedArrestingOfficerIndex, setSelectedArrestingOfficerIndex] = React.useState<number>(0);
-  const [missingFields, setMissingFields] = React.useState<string[]>([]);
-  const [unmappedMissingFields, setUnmappedMissingFields] = React.useState<string[]>([]);
   const [hasGeneratedReport, setHasGeneratedReport] = React.useState<boolean>(false);
-  const [activeValidationKind, setActiveValidationKind] = React.useState<AffidavitKind | null>(null);
-  const [activeValidationOptions, setActiveValidationOptions] = React.useState<{
-    witnessIndex?: number;
-    arrestingOfficerIndex?: number;
-  }>({});
-  const detailsValidationRootRef = React.useRef<HTMLDivElement | null>(null);
-  const visibleMissingFields = React.useMemo(() => missingFields.slice(0, 10), [missingFields]);
-  const hasMoreMissingFields = missingFields.length > visibleMissingFields.length;
-  const hasPoliceStationMissingFields = React.useMemo(
-    () => missingFields.some((field) => isPoliceStationMissingField(field)),
-    [missingFields],
-  );
 
   React.useEffect(() => {
     const maxWitnessIndex = Math.max(caseDetails.witnesses.length - 1, 0);
@@ -363,120 +131,6 @@ const ReportCreation: React.FC = () => {
         : caseDetails.policeStation,
     [caseDetails.policeStation, policeStation],
   );
-
-  const clearValidationHighlights = React.useCallback(() => {
-    const root = detailsValidationRootRef.current;
-    if (!root) return;
-
-    root.querySelectorAll(".missing-required-field").forEach((element) => {
-      element.classList.remove("missing-required-field");
-    });
-    root.querySelectorAll(".missing-required-action").forEach((element) => {
-      element.classList.remove("missing-required-action");
-    });
-  }, []);
-
-  const applyValidationHighlights = React.useCallback(
-    (fields: string[]) => {
-      const root = detailsValidationRootRef.current;
-      if (!root) return;
-
-      clearValidationHighlights();
-
-      if (fields.length === 0) {
-        setUnmappedMissingFields([]);
-        return;
-      }
-
-      const formControls = Array.from(root.querySelectorAll<HTMLElement>(".MuiFormControl-root"));
-      const actionButtons = Array.from(root.querySelectorAll<HTMLElement>("button"));
-      const unresolved: string[] = [];
-
-      const markControlsByLabel = (targetLabel: string): number => {
-        const normalizedLabel = normalizeUiText(targetLabel);
-        let matches = 0;
-
-        formControls.forEach((control) => {
-          const labelElement = control.querySelector<HTMLElement>("label");
-          if (!labelElement) return;
-
-          if (normalizeUiText(labelElement.textContent ?? "") === normalizedLabel) {
-            control.classList.add("missing-required-field");
-            matches += 1;
-          }
-        });
-
-        return matches;
-      };
-
-      const markActionButton = (targetLabel: string): boolean => {
-        const normalizedLabel = normalizeUiText(targetLabel);
-        let found = false;
-
-        actionButtons.forEach((button) => {
-          if (normalizeUiText(button.textContent ?? "") === normalizedLabel) {
-            button.classList.add("missing-required-action");
-            found = true;
-          }
-        });
-
-        return found;
-      };
-
-      fields.forEach((field) => {
-        let matched = false;
-
-        mapMissingFieldToUiLabels(field).forEach((label) => {
-          if (markControlsByLabel(label) > 0) {
-            matched = true;
-          }
-        });
-
-        const normalizedField = normalizeUiText(field);
-        if (!matched && normalizedField === "at least one witness") {
-          matched = markActionButton("Add Witness");
-        }
-        if (!matched && normalizedField === "at least one arresting officer") {
-          matched = markActionButton("Add Arresting Officer");
-        }
-        if (!matched && normalizedField === "poseur buyer details") {
-          matched = markActionButton("Add Poseur Buyer");
-        }
-
-        if (!matched) {
-          unresolved.push(field);
-        }
-      });
-
-      setUnmappedMissingFields(Array.from(new Set(unresolved)));
-    },
-    [clearValidationHighlights],
-  );
-
-  React.useEffect(() => {
-    if (!activeValidationKind) return;
-    const missing = validateCaseDetailsForAffidavit(
-      caseDetails,
-      getStationPayload(),
-      activeValidationKind,
-      activeValidationOptions,
-    );
-    setMissingFields(missing);
-
-    if (missing.length === 0) {
-      setUnmappedMissingFields([]);
-      setActiveValidationKind(null);
-      setActiveValidationOptions({});
-    }
-  }, [activeValidationKind, activeValidationOptions, caseDetails, getStationPayload]);
-
-  React.useEffect(() => {
-    if (view !== "details") {
-      clearValidationHighlights();
-      return;
-    }
-    applyValidationHighlights(missingFields);
-  }, [applyValidationHighlights, clearValidationHighlights, missingFields, view]);
 
   const handleOpenGenerateDialog = React.useCallback(() => {
     setModeDialogOpen(true);
@@ -520,26 +174,6 @@ const ReportCreation: React.FC = () => {
     if (isGeneratingRef.current) return;
 
     const stationPayload = getStationPayload();
-
-    const missing = validateCaseDetailsForAffidavit(caseDetails, stationPayload, kind, options);
-    if (missing.length > 0) {
-      setMissingFields(missing);
-      setActiveValidationKind(kind);
-      setActiveValidationOptions(options ?? {});
-      setModeDialogOpen(false);
-      setSelectionDialogKind(null);
-      setView("details");
-      requestAnimationFrame(() => {
-        detailsValidationRootRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-      });
-      return;
-    }
-
-    setActiveValidationKind(null);
-    setActiveValidationOptions({});
-    setMissingFields([]);
-    setUnmappedMissingFields([]);
-    clearValidationHighlights();
 
     isGeneratingRef.current = true;
     setModeDialogOpen(false);
@@ -609,7 +243,7 @@ const ReportCreation: React.FC = () => {
       isGeneratingRef.current = false;
       setIsFetching(false);
     }
-  }, [caseDetails, clearValidationHighlights, getStationPayload, resultEditor, setIsFetching, setSlateValue, title]);
+  }, [caseDetails, getStationPayload, resultEditor, setIsFetching, setSlateValue, title]);
 
   const handleSelectAffidavitKind = React.useCallback((kind: AffidavitKind) => {
     if (kind === "witness") {
@@ -877,75 +511,7 @@ const ReportCreation: React.FC = () => {
             onLoadError={handleLoadError}
             onGenerateReport={handleOpenGenerateDialog}
             resultContent={<EditorComponent editor={resultEditor} />}
-            detailsContent={
-              <Stack
-                ref={detailsValidationRootRef}
-                spacing={1.5}
-                sx={{
-                  "& .missing-required-field .MuiOutlinedInput-notchedOutline": {
-                    borderColor: "error.main !important",
-                    borderWidth: 2,
-                  },
-                  "& .missing-required-field .MuiInputLabel-root": {
-                    color: "error.main !important",
-                  },
-                  "& .missing-required-action": {
-                    borderColor: "error.main",
-                    color: "error.main",
-                  },
-                }}
-              >
-                {unmappedMissingFields.length > 0 && (
-                  <Stack spacing={0.25} sx={{ px: 0.5 }}>
-                    <Typography color="error" variant="body2">
-                      Some missing fields could not be auto-highlighted:
-                    </Typography>
-                    {unmappedMissingFields.map((field) => (
-                      <Typography key={field} color="error" variant="caption">
-                        - {field}
-                      </Typography>
-                    ))}
-                  </Stack>
-                )}
-                {missingFields.length > 0 && (
-                  <Alert
-                    severity="error"
-                    variant="outlined"
-                    sx={{ alignItems: "flex-start" }}
-                    action={
-                      hasPoliceStationMissingFields ? (
-                        <Button
-                          color="error"
-                          size="small"
-                          onClick={() => navigate("/police-station-management")}
-                        >
-                          Open Police Station
-                        </Button>
-                      ) : undefined
-                    }
-                  >
-                    <AlertTitle>
-                      Cannot generate affidavit of{" "}
-                      {formatAffidavitKind(activeValidationKind ?? "complainant")}
-                    </AlertTitle>
-                    <Typography variant="body2">
-                      Complete the required fields below, then try generating again.
-                    </Typography>
-                    {visibleMissingFields.map((field) => (
-                      <Typography key={field} variant="caption" component="div">
-                        - {field}
-                      </Typography>
-                    ))}
-                    {hasMoreMissingFields && (
-                      <Typography variant="caption" component="div">
-                        - ...and {missingFields.length - visibleMissingFields.length} more fields
-                      </Typography>
-                    )}
-                  </Alert>
-                )}
-                <CaseDetailsForm />
-              </Stack>
-            }
+            detailsContent={<CaseDetailsForm />}
             moreOptions={
               <>
                 <input

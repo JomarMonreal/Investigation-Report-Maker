@@ -43,7 +43,6 @@ const ComplainantForm: React.FC<ComplainantFormProps> = ({
       <TextField
         className={css.field}
         label="Full Name"
-        required
         value={complainant.fullName}
         onChange={(event) => handleFieldChange('fullName', event.target.value)}
         fullWidth
@@ -133,7 +132,6 @@ const ComplainantForm: React.FC<ComplainantFormProps> = ({
       <TextField
         className={css.field}
         label="Address"
-        required
         value={complainant.address}
         onChange={(event) => handleFieldChange('address', event.target.value)}
         fullWidth

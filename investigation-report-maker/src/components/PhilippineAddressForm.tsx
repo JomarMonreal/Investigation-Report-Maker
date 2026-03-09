@@ -39,7 +39,6 @@ const PhilippineAddressForm: React.FC<PhilippineAddressFormProps> = ({
             onChange={(event) => handleFieldChange('barangay', event.target.value)}
             fullWidth
             size="small"
-            required
           />
           <TextField
             label="City / Municipality"
@@ -49,7 +48,6 @@ const PhilippineAddressForm: React.FC<PhilippineAddressFormProps> = ({
             }
             fullWidth
             size="small"
-            required
           />
           <TextField
             label="Province"
@@ -57,7 +55,6 @@ const PhilippineAddressForm: React.FC<PhilippineAddressFormProps> = ({
             onChange={(event) => handleFieldChange('province', event.target.value)}
             fullWidth
             size="small"
-            required
           />
         </Stack>
 

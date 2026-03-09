@@ -73,7 +73,6 @@ const PoliceStationForm: React.FC = () => {
       <TextField
         label="Police Station Name"
         fullWidth
-        required
         value={policeStation.name}
         onChange={(event) =>
           handleStationFieldChange('name', event.target.value)
@@ -146,7 +145,6 @@ const PoliceStationForm: React.FC = () => {
       <TextField
         label="Barangay"
         fullWidth
-        required
         value={address.barangay}
         onChange={(event) =>
           handleAddressFieldChange('barangay', event.target.value)
@@ -156,7 +154,6 @@ const PoliceStationForm: React.FC = () => {
       <TextField
         label="City or Municipality"
         fullWidth
-        required
         value={address.cityOrMunicipality}
         onChange={(event) =>
           handleAddressFieldChange('cityOrMunicipality', event.target.value)
@@ -166,7 +163,6 @@ const PoliceStationForm: React.FC = () => {
       <TextField
         label="Province"
         fullWidth
-        required
         value={address.province}
         onChange={(event) =>
           handleAddressFieldChange('province', event.target.value)

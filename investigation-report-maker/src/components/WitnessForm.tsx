@@ -34,7 +34,6 @@ const WitnessForm: React.FC<WitnessFormProps> = ({ onChange, witness }) => {
       <TextField
         className={css.field}
         label="Full Name"
-        required
         value={witness.fullName}
         onChange={(event) => handleFieldChange('fullName', event.target.value)}
         fullWidth
@@ -43,7 +42,6 @@ const WitnessForm: React.FC<WitnessFormProps> = ({ onChange, witness }) => {
       <TextField
         className={css.field}
         label="Address"
-        required
         value={witness.address}
         onChange={(event) => handleFieldChange('address', event.target.value)}
         fullWidth
@@ -84,7 +82,6 @@ const WitnessForm: React.FC<WitnessFormProps> = ({ onChange, witness }) => {
       <TextField
         className={css.field}
         label="Location During Incident"
-        required
         value={witness.locationDuringIncident}
         onChange={(event) =>
           handleFieldChange('locationDuringIncident', event.target.value)
@@ -97,7 +94,6 @@ const WitnessForm: React.FC<WitnessFormProps> = ({ onChange, witness }) => {
       <TextField
         className={css.field}
         label="Observation Narrative"
-        required
         value={witness.observationNarrative}
         onChange={(event) =>
           handleFieldChange('observationNarrative', event.target.value)
